@@ -33,6 +33,7 @@ class NcIterableDataset(IterableDataset):
         space_dims=[2, 3],
         time_dim=0,
         flatten=True,
+        keep_in_memory=False,
     ):
 
         self.flatten = flatten
@@ -51,6 +52,13 @@ class NcIterableDataset(IterableDataset):
             self.files = files_or_pattern
         else:
             raise ValueError("unsupported files_or_pattern")
+
+        self.keep_in_memory = (
+            keep_in_memory & (len(self.files) <= max_files_in_memory) & (not shuffle)
+        )
+        if self.keep_in_memory:
+            logger.info(f"keeping entire dataset of {len(self.files)} files in memory")
+        self.cache = dict()
 
         self.inputs = inputs
         self.outputs = outputs
@@ -74,36 +82,34 @@ class NcIterableDataset(IterableDataset):
                 len(self.files) * self.dimensions[self.time_dim] // self.batch_size
             )
 
-
         self.input_index = self.get_variable_index(inputs)
         self.output_index = self.get_variable_index(outputs)
-
+        self.input_size = list(self.input_index.values())[-1][-1]
+        self.output_size = list(self.output_index.values())[-1][-1]
 
     def __len__(self):
         return self.size
 
-    def get_dimension(self,name):
+    def get_dimension(self, name):
         return netCDF4_Dataset(self.files[0], "r", format="NETCDF4")[name].shape
 
-    def get_variable_index(self,variable_names):
+    def get_variable_index(self, variable_names):
         out = OrderedDict()
         i = 0
         for n in variable_names:
             shape = self.get_dimension(n)
-            if len(shape)<4:
+            if len(shape) < 4:
                 num_channels = 1
             elif len(shape) == 4:
                 num_channels = shape[self.channel_dim]
             else:
                 raise ValueError("all variables must have at least 3 dims")
             j = i + num_channels
-            out[n] = [i,j]
-            i  = j
+            out[n] = [i, j]
+            i = j
 
         return out
 
-
-            
     def load_variable(self, name, dataset):
         v = torch.from_numpy(np.asarray(dataset[name]))
         if len(v.shape) < 3:
@@ -133,7 +139,22 @@ class NcIterableDataset(IterableDataset):
 
         return x, y
 
+    def store_in_cache(self, files, data):
+        key = " ".join(files)
+        self.cache[key] = data
+
+    def get_from_cache(self, files):
+        key = " ".join(files)
+        return self.cache.get(key)
+
     def load_files(self, files):
+
+        if self.keep_in_memory:
+            out = self.get_from_cache(files)
+            if out is not None:
+                x, y = out
+                return x, y
+
         x = []
         y = []
         logger.info(f"loading {len(files)} files")
@@ -142,7 +163,12 @@ class NcIterableDataset(IterableDataset):
             x.append(xi)
             y.append(yi)
 
-        return torch.cat(x), torch.cat(y)
+        out = torch.cat(x), torch.cat(y)
+
+        if self.keep_in_memory:
+            self.store_in_cache(files, out)
+
+        return out
 
     def get_epoch_data(self):
         files_shuffled = self.files.copy()

@@ -44,30 +44,41 @@ def compute_stats():
     torch.save(out_dict, "stats.pt")
 
 
-def run():
+def run(flatten = True, gpus=[3]):
 
-    files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))[:-34]
-    # Ntrain = int(len(files) * 0.9)
-    # train_files = files[:Ntrain]
-    # test_files = files[Ntrain:]
+    pl.seed_everything(345)
 
-    flatten = False
+    files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
+    train_files = files[:-34]
+    val_files = files[-34:]
 
     train_dataset = NcIterableDataset(
-        files,
+        train_files,
         max_files_in_memory=50,
-        batch_size=24,
+        batch_size=24 if not flatten else 2048,
         shuffle=True,
         flatten=flatten, #False  -> use "globe" images 
         inputs=inputs,
         outputs=outputs,
     )
+
+    val_dataset = NcIterableDataset(
+        val_files,
+        max_files_in_memory=len(val_files),
+        batch_size=3*48 if not flatten else 3*48*96*144,
+        shuffle=False,
+        flatten=flatten, #False  -> use "globe" images 
+        inputs=inputs,
+        outputs=outputs,
+        keep_in_memory=True,
+    )
+
     # train_dataset = make_dummy_dataset()
     # val_dataset = NcDatasetMem(test_files)
 
-    model_config = {"model_type": "conv",
-                     "input_size" : list(train_dataset.input_index.values())[-1][-1],
-                     "output_size": list(train_dataset.output_index.values())[-1][-1]}
+    model_config = {"model_type": "conv" if not flatten else "fcn",
+                     "input_size" : train_dataset.input_size,
+                     "output_size": train_dataset.output_size}
 
     model = TrainingModel(
         model_config=model_config,
@@ -77,15 +88,17 @@ def run():
     )
 
     train_data_loader = DataLoader(train_dataset, batch_size=None, pin_memory=True)
-    # test_data_loader = DataLoader(
-    #     val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True
-    # )
+    val_data_loader = DataLoader(val_dataset, batch_size=None, pin_memory=True)
+    
+
 
     trainer = pl.Trainer(
-        gpus=[2],
+        gpus=gpus,
         # checkpoint_callback=False,
         # logger=False,
         precision=16,
+        log_every_n_steps = len(train_dataset)//100
     )
 
-    trainer.fit(model, train_data_loader)
+    trainer.fit(model, train_data_loader, val_data_loader)
+    # trainer.validate(model,val_data_loader)

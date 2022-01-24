@@ -29,12 +29,20 @@ class NcIterableDataset(IterableDataset):
         max_files_in_memory=50,
         shuffle=True,
         batch_size=10,
-        var_dim=1,
+        channel_dim=1,
+        space_dims=[2, 3],
+        time_dim=0,
+        flatten=True,
     ):
 
+        self.flatten = flatten
         self.max_files_in_memory = max_files_in_memory
         self.shuffle = shuffle
-        self.var_dim = var_dim
+
+        self.channel_dim = channel_dim
+        self.time_dim = time_dim
+        self.space_dims = space_dims
+
         self.batch_size = batch_size
 
         if isinstance(files_or_pattern, str):
@@ -51,36 +59,75 @@ class NcIterableDataset(IterableDataset):
         assert len(inputs) > 0
         assert len(outputs) > 0
 
-        self.dimensions = self.get_dimension()
+        self.dimensions = self.get_dimension(inputs[0])
 
-        self.size = len(self.files)*prod(self.dimensions)//self.dimensions[var_dim]//self.batch_size
+        if self.flatten:
+            self.size = (
+                len(self.files)
+                * self.dimensions[self.time_dim]
+                * self.dimensions[self.space_dims[0]]
+                * self.dimensions[self.space_dims[1]]
+                // self.batch_size
+            )
+        else:
+            self.size = (
+                len(self.files) * self.dimensions[self.time_dim] // self.batch_size
+            )
+
+
+        self.input_index = self.get_variable_index(inputs)
+        self.output_index = self.get_variable_index(outputs)
+
 
     def __len__(self):
         return self.size
 
-    def get_dimension(self):
-        return netCDF4_Dataset(self.files[0], "r", format="NETCDF4")[self.inputs[0]].shape
+    def get_dimension(self,name):
+        return netCDF4_Dataset(self.files[0], "r", format="NETCDF4")[name].shape
+
+    def get_variable_index(self,variable_names):
+        out = OrderedDict()
+        i = 0
+        for n in variable_names:
+            shape = self.get_dimension(n)
+            if len(shape)<4:
+                num_channels = 1
+            elif len(shape) == 4:
+                num_channels = shape[self.channel_dim]
+            else:
+                raise ValueError("all variables must have at least 3 dims")
+            j = i + num_channels
+            out[n] = [i,j]
+            i  = j
+
+        return out
+
+
+            
+    def load_variable(self, name, dataset):
+        v = torch.from_numpy(np.asarray(dataset[name]))
+        if len(v.shape) < 3:
+            raise ValueError("variables must have at least 3 dimensions")
+
+        if len(v.shape) == 3:  # scalar
+            v = v[:, None, :, :]  # adding singleton dimension
+
+        num_channels = v.shape[self.channel_dim]
+
+        if self.flatten:
+            v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
+        return v
 
     def load_file(self, file):
         dataset = netCDF4_Dataset(file, "r", format="NETCDF4")
         # TODO dont hard code
         x = torch.cat(
-            [
-                torch.from_numpy(np.asarray(dataset[n]))
-                .permute([0, 2, 3, 1])
-                .reshape(-1, 26)
-                for n in self.inputs
-            ],
+            [self.load_variable(n, dataset) for n in self.inputs],
             dim=1,
         )
 
         y = torch.cat(
-            [
-                torch.from_numpy(np.asarray(dataset[n]))
-                .permute([0, 2, 3, 1])
-                .reshape(-1, 26)
-                for n in self.outputs
-            ],
+            [self.load_variable(n, dataset) for n in self.outputs],
             dim=1,
         )
 
@@ -107,13 +154,13 @@ class NcIterableDataset(IterableDataset):
                 start_file_index : start_file_index + self.max_files_in_memory
             ]
             x, y = self.load_files(files_to_load)
-            
+
             if self.shuffle:
                 shuffled_index = torch.randperm(x.shape[0])
             else:
                 shuffled_index = torch.arange(x.shape[0])
 
-            for i in range(0,x.shape[0],self.batch_size):
+            for i in range(0, x.shape[0], self.batch_size):
                 start = i
                 end = start + self.batch_size
                 indeces = shuffled_index[start:end]
@@ -131,6 +178,7 @@ class NcDatasetMem(Dataset):
         outputs: list = ["PTEQ", "PTTEND"],
         var_dim=1,
     ):
+        raise DeprecationWarning
         if isinstance(files_or_pattern, str):
             self.files = sorted(glob.glob(files_or_pattern))
         elif isinstance(files_or_pattern, list):

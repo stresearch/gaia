@@ -117,3 +117,6 @@ dmypy.json
 
 # custom
 *scratch*
+.vscode/*
+lightning_logs/*
+stats.pt

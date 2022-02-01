@@ -1,23 +1,35 @@
+from asyncio.log import logger
 from collections import OrderedDict
 from typing import List
+from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
 from gaia.layers import Normalization
+import os
+import torch_optimizer
 
 
 class TrainingModel(LightningModule):
     def __init__(
         self,
         lr: float = 0.0002,
+        optimizer="adam",
         input_index=None,
         output_index=None,
-        model_config=OrderedDict(model_type = "fcn"),
+        model_config=dict(model_type="fcn"),
         data_stats=None,
+        **kwargs,
     ):
         super().__init__()
-        self.save_hyperparameters()
-        model_type = model_config.pop("model_type")
+        
+        if not isinstance(data_stats,str):
+            ignore = ["data_stats"]
+        else:
+            ignore = None
+
+        self.save_hyperparameters(ignore=ignore)
+        model_type = model_config["model_type"]
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
         elif model_type == "conv":
@@ -25,19 +37,49 @@ class TrainingModel(LightningModule):
         else:
             raise ValueError("unknown model_type")
 
-        self.input_normalize, self.output_normalize = list(self.setup_normalize())
+        self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
 
-    def setup_normalize(self):
-        stats = torch.load(self.hparams.data_stats)
+        if len(kwargs) > 0:
+            logger.warning(f"unkown kwargs {list(kwargs.keys())}")
+
+    def setup_normalize(self, data_stats):
+        if isinstance(data_stats, str) and os.path.exists(data_stats):
+            stats = torch.load(data_stats)
+        elif isinstance(data_stats, dict):
+            stats = data_stats
+        elif data_stats is None:
+            logger.warning(
+                "no stats provided, assuming will be loaded later, initializing randomly"
+            )
+
+            layers = []
+            for v in ["input_size", "output_size"]:
+                layers.append(
+                    Normalization(
+                        torch.rand(self.hparams.model_config[v]),
+                        torch.rand(self.hparams.model_config[v]),
+                    )
+                )
+            return layers
+        else:
+            raise ValueError("unsupported stats format")
+
+        layers = []
         for k in ["input_stats", "output_stats"]:
             stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
             stats[k]["std_eff"] = torch.where(
                 stats[k]["std"] > 1e-9, stats[k]["std"], stats[k]["range"]
             )
-            yield Normalization(stats[k]["mean"], stats[k]["std_eff"])
+            layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
+
+        return layers
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        if self.hparams.optimizer == "adam":
+            optim = torch.optim.Adam
+        elif self.hparams.optimizer == "lamb":
+            optim = torch_optimizer.Lamb
+        return optim(self.parameters(), lr=self.hparams.lr)
 
     def forward(self, x):
         return self.model(x)
@@ -70,6 +112,13 @@ class TrainingModel(LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "val")
 
+    def predict_step(self, batch, batch_idx, dataloader_idx=None):
+        x, y = batch
+        x = self.input_normalize(x)
+        yhat = self(x)
+        yhat = self.output_normalize(yhat, normalize=False)  # denormalize
+        return yhat.cpu()
+
 
 class FcnBaseline(torch.nn.Module):
     def __init__(
@@ -80,6 +129,7 @@ class FcnBaseline(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        model_type=None,
     ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -122,6 +172,7 @@ class ConvNet1x1(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        model_type=None,
     ):
         super().__init__()
 
@@ -149,7 +200,9 @@ class ConvNet1x1(torch.nn.Module):
             make_layer(self.hidden_size, self.hidden_size)
             for _ in range(self.num_layers - 2)
         ]
-        output_layer = torch.nn.Conv2d(self.hidden_size, self.output_size, kernel_size=1, bias=True)
+        output_layer = torch.nn.Conv2d(
+            self.hidden_size, self.output_size, kernel_size=1, bias=True
+        )
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 

@@ -27,7 +27,12 @@ logger = get_logger(__name__)
 
 
 inputs = ["T", "Q", "RELHUM", "U", "V"]
-outputs = ["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"]
+# outputs = ["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"]
+outputs = ["PTEQ", "PTTEND", "PRECT"]
+
+
+# from here https://arxiv.org/pdf/2010.12996.pdf
+SCALING_FACTORS = {"PRECT": 1728000.0, "PTTEND": 1.00464e3, "PTEQ": 2.501e6 + 3.337e5}
 
 def dict_hash(dictionary):
     """MD5 hash of a dictionary."""
@@ -287,13 +292,13 @@ class NcIterableDataset(IterableDataset):
 
         if self.compute_stats:
             out["stats"] = dict(
-                input_stats=self.compute_stats(x), output_stats=self.compute_stats(y)
+                input_stats=self.get_stats(x), output_stats=self.get_stats(y)
             )
 
         return out
 
     @staticmethod
-    def compute_stats(x):
+    def get_stats(x):
         logger.info(f"computing stats for tensor of shape {x.shape}")
         outs = dict()
         if len(x.shape) == 4:
@@ -310,6 +315,13 @@ class NcIterableDataset(IterableDataset):
         return outs
 
 
+def flatten(x):
+    return x.permute([0, 2, 3, 1]).reshape(-1, x.shape[1])
+
+def unflatten(x):
+    return x.reshape(-1,96,144,x.shape[1]).permute([0, 3, 1, 2])
+
+
 def get_dataset(
     files=None,
     subsample_factor=12,
@@ -317,6 +329,8 @@ def get_dataset(
     shuffle=False,
     in_memory=True,
     flatten=True,
+    compute_stats = True,
+    flatten_anyway = False,
 ):
 
     
@@ -333,8 +347,14 @@ def get_dataset(
         inputs=inputs,
         outputs=outputs,
         subsample_factor=subsample_factor,
-        compute_stats=True,
+        compute_stats=compute_stats,
     ).get_tensors(cache_dir="/ssddg1/gaia/cache")
+
+
+    if flatten_anyway:
+        logger.warning("flattening dataset")
+        for v in ["x", "y"]:
+            dataset_dict[v] = dataset_dict[v].permute([0, 2, 3, 1]).reshape(-1, dataset_dict[v].shape[1])
 
     data_loader = DataLoader(
         FastTensorDataset(

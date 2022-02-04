@@ -1,5 +1,6 @@
 from asyncio.log import logger
 from collections import OrderedDict
+import os
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
     NcDatasetMem,
@@ -7,6 +8,9 @@ from gaia.data import (
     NcIterableDataset,
     FastTensorDataset,
     get_dataset,
+    unflatten,
+    inputs,
+    outputs
 )
 import glob
 from torch.utils.data import DataLoader
@@ -17,8 +21,6 @@ from gaia import get_logger
 
 logger = get_logger(__name__)
 
-inputs = ["T", "Q", "RELHUM", "U", "V"]
-outputs = ["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"]
 
 def compute_stats():
     model = ComputeStats()
@@ -123,6 +125,7 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             shuffle=True,
             in_memory=True,
             flatten=flatten,
+            compute_stats = True
         ),
         val=dict(
             files=val_files,
@@ -131,6 +134,7 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             shuffle=False,
             in_memory=True,
             flatten=flatten,
+            compute_stats = False
         ),
         test=dict(
             files=test_files,
@@ -139,17 +143,22 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             shuffle=False,
             in_memory=True,
             flatten=flatten,
+            compute_stats = False,
         ),
     )
 
 
-def default_model_params():
-    return dict(
+def default_model_params(**kwargs):
+    d =  dict(
         model_config={
             "model_type": "fcn",
             "num_layers": 7,
         }
     )
+
+    d.update(kwargs)
+
+    return d
 
 
 def default_trainer_params(gpus=None):
@@ -188,21 +197,23 @@ def main(
     elif mode == "test":
         assert "ckpt" in model_params
 
-        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
-        model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
+        model = TrainingModel.load_from_checkpoint(model_params["ckpt"],**model_params)
+        test_dataset, test_dataloader = get_dataset(flatten_anyway=True, **dataset_params["test"] )
+
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
             checkpoint_callback=False,
             logger=False,
             **trainer_params,
         )
-        trainer.validate(model, dataloaders=test_dataloader)
+        trainer.test(model, dataloaders=test_dataloader)
 
     elif mode == "predict":
         assert "ckpt" in model_params
 
-        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
         model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
+        test_dataset, test_dataloader = get_dataset(flatten_anyway=True, **dataset_params["test"])
+
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
             checkpoint_callback=False,
@@ -210,7 +221,15 @@ def main(
             **trainer_params,
         )
         yhat = trainer.predict(model, dataloaders=test_dataloader)
-        return yhat
+        # return yhat
+        yhat = torch.cat(yhat)
+
+        if len(yhat.shape) == 2:
+            yhat = unflatten(yhat)
+
+        save_dir = os.path.join(os.path.split(model_params["ckpt"])[0],"predictions.pt")
+        torch.save(yhat,save_dir)
+
 
 
 def run(

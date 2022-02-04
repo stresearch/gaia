@@ -5,6 +5,7 @@ from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
+from gaia.data import SCALING_FACTORS
 from gaia.layers import Normalization
 import os
 import torch_optimizer
@@ -18,12 +19,13 @@ class TrainingModel(LightningModule):
         input_index=None,
         output_index=None,
         model_config=dict(model_type="fcn"),
-        data_stats=None,
+        data_stats= None,
+        use_output_scaling = True,
         **kwargs,
     ):
         super().__init__()
-        
-        if not isinstance(data_stats,str):
+
+        if not isinstance(data_stats, str):
             ignore = ["data_stats"]
         else:
             ignore = None
@@ -51,7 +53,6 @@ class TrainingModel(LightningModule):
             logger.warning(
                 "no stats provided, assuming will be loaded later, initializing randomly"
             )
-
             layers = []
             for v in ["input_size", "output_size"]:
                 layers.append(
@@ -65,14 +66,49 @@ class TrainingModel(LightningModule):
             raise ValueError("unsupported stats format")
 
         layers = []
-        for k in ["input_stats", "output_stats"]:
-            stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
-            stats[k]["std_eff"] = torch.where(
-                stats[k]["std"] > 1e-9, stats[k]["std"], stats[k]["range"]
-            )
-            layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
+        input_norm = self.get_normalization(stats["input_stats"])
+        #TODO don't hard code but lets use actual training data stats for input normalization
 
-        return layers
+        if self.hparams.use_output_scaling:
+            logger.warning("logger using predefined output scaling")
+            output_norm = self.get_predefined_output_normalization()
+        else:
+            output_norm = self.get_normalization(stats["output_stats"])
+
+        return input_norm, output_norm
+
+
+        # for k in vars_to_setup_norm_for:
+        #     # stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
+        #     stats[k]["range"] = torch.maximum(
+        #         stats[k]["max"] - stats[k]["mean"], stats[k]["mean"] - stats[k]["min"]
+        #     )
+        #     stats[k]["std_eff"] = torch.where(
+        #         stats[k]["std"] > 1e-9, stats[k]["std"], stats[k]["range"]
+        #     )
+        #     layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
+
+
+    def get_predefined_output_normalization(self):
+        mean  = torch.zeros(self.hparams.model_config["output_size"])
+        std = torch.ones(self.hparams.model_config["output_size"])
+        for k,v in self.hparams.output_index.items():
+            s,e = v
+            std[s:e] *= 1./SCALING_FACTORS[k]
+
+        return Normalization(mean,std)
+
+    def get_normalization(self,stats):
+        thr = 1e-9
+        stats["range"] = torch.maximum(
+                stats["max"] - stats["mean"], stats["mean"] - stats["min"]
+            )
+        stats["std_eff"] = torch.where(
+            stats["std"] > thr, stats["std"], stats["range"]
+        )
+        return Normalization(stats["mean"],stats["std_eff"])
+        
+
 
     def configure_optimizers(self):
         if self.hparams.optimizer == "adam":
@@ -111,6 +147,51 @@ class TrainingModel(LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "val")
+
+    def test_step(self, batch, batch_idx, dataloader_idx=None):
+        x, y_unnorm = batch
+        x = self.input_normalize(x)
+        y = self.output_normalize(y_unnorm)
+        yhat = self(x)
+        loss = OrderedDict()
+        loss["mse"] = 0.0
+
+        mode = "test"
+
+        for k, v in self.hparams.output_index.items():
+            loss_name = f"mse_{k}"
+            loss[loss_name] = F.mse_loss(
+                yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
+            )
+            w = 1.0
+            loss["mse"] += w * loss[loss_name]
+            self.log(
+                f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
+            )
+
+        self.log(f"{mode}_mse", loss[f"mse"], on_epoch=True)
+
+        ##unnorm
+
+        loss["mse_u"] = 0.0
+
+        mode = "test"
+
+        yhat = self.output_normalize(yhat, normalize=False)
+        y = y_unnorm
+
+        for k, v in self.hparams.output_index.items():
+            loss_name = f"mse_u_{k}"
+            loss[loss_name] = F.mse_loss(
+                yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
+            )
+            w = 1.0
+            loss["mse_u"] += w * loss[loss_name]
+            self.log(
+                f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
+            )
+
+        self.log(f"{mode}_mse_u", loss[f"mse_u"], on_epoch=True)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         x, y = batch

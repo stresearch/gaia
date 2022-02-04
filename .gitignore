@@ -121,3 +121,4 @@ dmypy.json
 lightning_logs/*
 stats.pt
 *.pt
+*.html

@@ -45,11 +45,11 @@ from gaia.training import (
 #               dataset_params = default_dataset_params(subsample_factor=1),
 #               model_params =   default_model_params(lr = 1e-3))
 
-ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
-
-main("predict", trainer_params = default_trainer_params(gpus=[3]),
-                dataset_params = default_dataset_params(subsample_factor=1),
-                model_params =   default_model_params(ckpt=ckpt))
+# ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
+ckpt = "lightning_logs_old/version_12/checkpoints/epoch=854-step=478799.ckpt"
+main("test", trainer_params = default_trainer_params(gpus=[3]),
+             dataset_params = default_dataset_params(subsample_factor=1, interleave=False),
+             model_params =   default_model_params(ckpt=ckpt))
 
 
 # model_params

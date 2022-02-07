@@ -1,5 +1,6 @@
 from asyncio.log import logger
 from collections import OrderedDict
+import json
 import os
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
@@ -9,8 +10,6 @@ from gaia.data import (
     FastTensorDataset,
     get_dataset,
     unflatten,
-    inputs,
-    outputs,
 )
 import glob
 from torch.utils.data import DataLoader
@@ -31,8 +30,8 @@ def compute_stats():
         batch_size=10 * 48,
         shuffle=False,
         flatten=False,
-        inputs=inputs,
-        outputs=outputs,
+        # inputs=inputs,
+        # outputs=outputs,
     )
     train_data_loader = DataLoader(train_dataset, batch_size=None, pin_memory=True)
     trainer = pl.Trainer(
@@ -48,8 +47,8 @@ def compute_stats():
     out_dict = OrderedDict()
     out_dict["input_stats"] = outs[0]
     out_dict["output_stats"] = outs[1]
-    out_dict["inputs"] = inputs
-    out_dict["outputs"] = outputs
+    # out_dict["inputs"] = inputs
+    # out_dict["outputs"] = outputs
     out_dict["files"] = files
 
     torch.save(out_dict, "stats.pt")
@@ -109,10 +108,11 @@ def update_model_params_from_dataset(dataset_dict, model_params):
         )
     )
 
-def get_train_val_test_split(files, interleave = False):
+
+def get_train_val_test_split(files, interleave=False):
     if not interleave:
-        #use last 10% for test
-        N = int(len(files)*.1)
+        # use last 10% for test
+        N = int(len(files) * 0.1)
         train_files = files[: -N * 2]
         val_files = files[-N * 2 : -N]
         test_files = files[-N:]
@@ -120,8 +120,8 @@ def get_train_val_test_split(files, interleave = False):
     else:
         train_files = []
         test_files = []
-        #last 3 days of every 30 days
-        for i,f in enumerate(files):
+        # last 3 days of every 30 days
+        for i, f in enumerate(files):
             if i % 30 < 27:
                 train_files.append(f)
             else:
@@ -130,10 +130,18 @@ def get_train_val_test_split(files, interleave = False):
         return train_files, test_files, test_files
 
 
-
-def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatten=True):
+def default_dataset_params(
+    batch_size=24 * 96 * 144,
+    subsample_factor=12,
+    flatten=True,
+    interleave=True,
+    inputs=["T", "Q", "RELHUM", "U", "V"],
+    outputs=["PTEQ", "PTTEND", "PRECT"],
+):
     files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
-    train_files, val_files, test_files = get_train_val_test_split(files, interleave=True)
+    train_files, val_files, test_files = get_train_val_test_split(
+        files, interleave=interleave
+    )
 
     return dict(
         train=dict(
@@ -144,6 +152,8 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             in_memory=True,
             flatten=flatten,
             compute_stats=True,
+            inputs=inputs,
+            outputs=outputs,
         ),
         val=dict(
             files=val_files,
@@ -153,6 +163,8 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             in_memory=True,
             flatten=False,
             compute_stats=False,
+            inputs=inputs,
+            outputs=outputs,
         ),
         test=dict(
             files=test_files,
@@ -162,6 +174,8 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             in_memory=True,
             flatten=False,
             compute_stats=False,
+            inputs=inputs,
+            outputs=outputs,
         ),
     )
 
@@ -209,7 +223,9 @@ def main(
 
     if mode == "train":
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
-        val_dataset, val_dataloader = get_dataset(flatten_anyway=True, **dataset_params["val"])
+        val_dataset, val_dataloader = get_dataset(
+            flatten_anyway=True, **dataset_params["val"]
+        )
         # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
 
         update_model_params_from_dataset(train_dataset, model_params)
@@ -223,7 +239,7 @@ def main(
     elif mode == "test":
         assert "ckpt" in model_params
 
-        model = TrainingModel.load_from_checkpoint(model_params["ckpt"], **model_params)
+        model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
         test_dataset, test_dataloader = get_dataset(
             flatten_anyway=True, **dataset_params["test"]
         )
@@ -234,7 +250,10 @@ def main(
             logger=False,
             **trainer_params,
         )
-        trainer.test(model, dataloaders=test_dataloader)
+        test_results = trainer.test(model, dataloaders=test_dataloader)
+        run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+        path_to_save = os.path.join(run_dir, "test_results.json")
+        json.dump(test_results, open(path_to_save, "w"))
 
     elif mode == "predict":
         assert "ckpt" in model_params

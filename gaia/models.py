@@ -118,6 +118,14 @@ class TrainingModel(LightningModule):
         x, y = batch
         x = self.input_normalize(x)
         y = self.output_normalize(y)
+
+        if len(x.shape) == 2:
+            reduce_dims = [0]
+        elif len(x.shape) == 4:
+            reduce_dims = [0,2,3]
+        else:
+            raise ValueError("wrong size of x")
+
         yhat = self(x)
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
@@ -137,8 +145,19 @@ class TrainingModel(LightningModule):
 
         if mode in ["test", "val"]:
             loss["skill_ave_clipped"] = (
-                (1.0 - mse.mean(0)/ y.var(0, unbiased=False) ).clip(0, 1).mean()
+                (1.0 - mse.mean(reduce_dims) / y.var(reduce_dims, unbiased=False)).clip(0, 1).mean()
             )
+
+            if mode == "test":
+                for k, v in self.hparams.output_index.items():
+                    loss_name = f"skill_ave_trunc_{k}"
+                    y_v = y[:, v[0] : v[1], ...]
+                    mse_v = mse[:, v[0] : v[1], ...]
+                    loss[loss_name] = (
+                        (1.0 - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False))
+                        .clip(0, 1)
+                        .mean()
+                    )
 
         loss["mse"] = mse.mean()
         for k, v in loss.items():
@@ -153,6 +172,9 @@ class TrainingModel(LightningModule):
         self.step(batch, "val")
 
     def test_step(self, batch, batch_idx, dataloader_idx=None):
+        self.step(batch, "test")
+
+    def _test_step(self, batch, batch_idx, dataloader_idx=None):
         x, y_unnorm = batch
         x = self.input_normalize(x)
         y = self.output_normalize(y_unnorm)

@@ -26,9 +26,9 @@ import hashlib
 logger = get_logger(__name__)
 
 
-inputs = ["T", "Q", "RELHUM", "U", "V"]
+# inputs = ["T", "Q", "RELHUM", "U", "V"]
 # outputs = ["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"]
-outputs = ["PTEQ", "PTTEND", "PRECT"]
+# outputs = ["PTEQ", "PTTEND", "PRECT"]
 
 
 # from here https://arxiv.org/pdf/2010.12996.pdf
@@ -331,6 +331,8 @@ def get_dataset(
     flatten=True,
     compute_stats = True,
     flatten_anyway = False,
+    inputs = None,
+    outputs = None,
 ):
 
     
@@ -348,6 +350,8 @@ def get_dataset(
         outputs=outputs,
         subsample_factor=subsample_factor,
         compute_stats=compute_stats,
+        inputs = inputs,
+        outputs = outputs
     ).get_tensors(cache_dir="/ssddg1/gaia/cache")
 
 

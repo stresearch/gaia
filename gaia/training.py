@@ -10,7 +10,7 @@ from gaia.data import (
     get_dataset,
     unflatten,
     inputs,
-    outputs
+    outputs,
 )
 import glob
 from torch.utils.data import DataLoader
@@ -109,13 +109,31 @@ def update_model_params_from_dataset(dataset_dict, model_params):
         )
     )
 
+def get_train_val_test_split(files, interleave = False):
+    if not interleave:
+        #use last 10% for test
+        N = int(len(files)*.1)
+        train_files = files[: -N * 2]
+        val_files = files[-N * 2 : -N]
+        test_files = files[-N:]
+        return train_files, val_files, test_files
+    else:
+        train_files = []
+        test_files = []
+        #last 3 days of every 30 days
+        for i,f in enumerate(files):
+            if i % 30 < 27:
+                train_files.append(f)
+            else:
+                test_files.append(f)
+
+        return train_files, test_files, test_files
+
+
 
 def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatten=True):
     files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
-    N = 34
-    train_files = files[: -N * 2]
-    val_files = files[-N * 2 : -N]
-    test_files = files[-N:]
+    train_files, val_files, test_files = get_train_val_test_split(files, interleave=True)
 
     return dict(
         train=dict(
@@ -125,7 +143,7 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             shuffle=True,
             in_memory=True,
             flatten=flatten,
-            compute_stats = True
+            compute_stats=True,
         ),
         val=dict(
             files=val_files,
@@ -133,8 +151,8 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             batch_size=batch_size,
             shuffle=False,
             in_memory=True,
-            flatten=flatten,
-            compute_stats = False
+            flatten=False,
+            compute_stats=False,
         ),
         test=dict(
             files=test_files,
@@ -142,18 +160,20 @@ def default_dataset_params(batch_size=24 * 96 * 144, subsample_factor=12, flatte
             batch_size=batch_size,
             shuffle=False,
             in_memory=True,
-            flatten=flatten,
-            compute_stats = False,
+            flatten=False,
+            compute_stats=False,
         ),
     )
 
 
 def default_model_params(**kwargs):
-    d =  dict(
+    d = dict(
+        lr=1e-3,
+        optimizer="adam",
         model_config={
             "model_type": "fcn",
             "num_layers": 7,
-        }
+        },
     )
 
     d.update(kwargs)
@@ -165,8 +185,14 @@ def default_trainer_params(gpus=None):
     return dict(gpus=gpus, precision=16)
 
 
-def make_pretty_for_log(d,max_char = 100):
-    return "\n".join([f"{k}: {str(v)[:max_char] if not isinstance(v,dict) else make_pretty_for_log(v)}" for k,v in d.items()])
+def make_pretty_for_log(d, max_char=100):
+    return "\n".join(
+        [
+            f"{k}: {str(v)[:max_char] if not isinstance(v,dict) else make_pretty_for_log(v)}"
+            for k, v in d.items()
+        ]
+    )
+
 
 def main(
     mode="train",
@@ -183,7 +209,7 @@ def main(
 
     if mode == "train":
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
-        val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+        val_dataset, val_dataloader = get_dataset(flatten_anyway=True, **dataset_params["val"])
         # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
 
         update_model_params_from_dataset(train_dataset, model_params)
@@ -197,8 +223,10 @@ def main(
     elif mode == "test":
         assert "ckpt" in model_params
 
-        model = TrainingModel.load_from_checkpoint(model_params["ckpt"],**model_params)
-        test_dataset, test_dataloader = get_dataset(flatten_anyway=True, **dataset_params["test"] )
+        model = TrainingModel.load_from_checkpoint(model_params["ckpt"], **model_params)
+        test_dataset, test_dataloader = get_dataset(
+            flatten_anyway=True, **dataset_params["test"]
+        )
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
@@ -212,7 +240,9 @@ def main(
         assert "ckpt" in model_params
 
         model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
-        test_dataset, test_dataloader = get_dataset(flatten_anyway=True, **dataset_params["test"])
+        test_dataset, test_dataloader = get_dataset(
+            flatten_anyway=True, **dataset_params["test"]
+        )
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
@@ -227,9 +257,10 @@ def main(
         if len(yhat.shape) == 2:
             yhat = unflatten(yhat)
 
-        save_dir = os.path.join(os.path.split(model_params["ckpt"])[0],"predictions.pt")
-        torch.save(yhat,save_dir)
-
+        save_dir = os.path.join(
+            os.path.split(model_params["ckpt"])[0], "predictions.pt"
+        )
+        torch.save(yhat, save_dir)
 
 
 def run(

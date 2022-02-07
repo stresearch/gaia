@@ -351,6 +351,8 @@ def get_dataset(
     ).get_tensors(cache_dir="/ssddg1/gaia/cache")
 
 
+    del dataset_dict["index"]
+
     if flatten_anyway:
         logger.warning("flattening dataset")
         for v in ["x", "y"]:

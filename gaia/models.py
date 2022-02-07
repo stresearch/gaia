@@ -19,8 +19,8 @@ class TrainingModel(LightningModule):
         input_index=None,
         output_index=None,
         model_config=dict(model_type="fcn"),
-        data_stats= None,
-        use_output_scaling = True,
+        data_stats=None,
+        use_output_scaling=True,
         **kwargs,
     ):
         super().__init__()
@@ -67,7 +67,7 @@ class TrainingModel(LightningModule):
 
         layers = []
         input_norm = self.get_normalization(stats["input_stats"])
-        #TODO don't hard code but lets use actual training data stats for input normalization
+        # TODO don't hard code but lets use actual training data stats for input normalization
 
         if self.hparams.use_output_scaling:
             logger.warning("logger using predefined output scaling")
@@ -76,7 +76,6 @@ class TrainingModel(LightningModule):
             output_norm = self.get_normalization(stats["output_stats"])
 
         return input_norm, output_norm
-
 
         # for k in vars_to_setup_norm_for:
         #     # stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
@@ -88,27 +87,22 @@ class TrainingModel(LightningModule):
         #     )
         #     layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
 
-
     def get_predefined_output_normalization(self):
-        mean  = torch.zeros(self.hparams.model_config["output_size"])
+        mean = torch.zeros(self.hparams.model_config["output_size"])
         std = torch.ones(self.hparams.model_config["output_size"])
-        for k,v in self.hparams.output_index.items():
-            s,e = v
-            std[s:e] *= 1./SCALING_FACTORS[k]
+        for k, v in self.hparams.output_index.items():
+            s, e = v
+            std[s:e] *= 1.0 / SCALING_FACTORS[k]
 
-        return Normalization(mean,std)
+        return Normalization(mean, std)
 
-    def get_normalization(self,stats):
+    def get_normalization(self, stats):
         thr = 1e-9
         stats["range"] = torch.maximum(
-                stats["max"] - stats["mean"], stats["mean"] - stats["min"]
-            )
-        stats["std_eff"] = torch.where(
-            stats["std"] > thr, stats["std"], stats["range"]
+            stats["max"] - stats["mean"], stats["mean"] - stats["min"]
         )
-        return Normalization(stats["mean"],stats["std_eff"])
-        
-
+        stats["std_eff"] = torch.where(stats["std"] > thr, stats["std"], stats["range"])
+        return Normalization(stats["mean"], stats["std_eff"])
 
     def configure_optimizers(self):
         if self.hparams.optimizer == "adam":
@@ -126,19 +120,29 @@ class TrainingModel(LightningModule):
         y = self.output_normalize(y)
         yhat = self(x)
         loss = OrderedDict()
-        loss["mse"] = 0.0
-        for k, v in self.hparams.output_index.items():
-            loss_name = f"mse_{k}"
-            loss[loss_name] = F.mse_loss(
-                yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
-            )
-            w = 1.0
-            loss["mse"] += w * loss[loss_name]
-            self.log(
-                f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
+        mse = F.mse_loss(y, yhat, reduction="none")
+
+        # if mode in ["test","val"]:
+
+        # for k, v in self.hparams.output_index.items():
+        #     loss_name = f"mse_{k}"
+        #     loss[loss_name] = F.mse_loss(
+        #         yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
+        #     )
+        #     w = 1.0
+        #     loss["mse"] += w * loss[loss_name]
+        #     self.log(
+        #         f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
+        #     )
+
+        if mode in ["test", "val"]:
+            loss["skill_ave_clipped"] = (
+                (1.0 - mse.mean(0)/ y.var(0, unbiased=False) ).clip(0, 1).mean()
             )
 
-        self.log(f"{mode}_mse", loss[f"mse"], on_epoch=True)
+        loss["mse"] = mse.mean()
+        for k, v in loss.items():
+            self.log(f"{mode}_{k}", v, on_epoch=True)
         return loss
 
     def training_step(self, batch, batch_idx):

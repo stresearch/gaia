@@ -1,9 +1,10 @@
 import os
 
 # os.environ["CUDA_LAUNCH_BLOCKING"]="1"
-from gaia.data import NcDatasetMem
 import glob
 import numpy as np
+import pytube
+
 
 # files_or_pattern = glob.glob("/proj/gaia-climate/data/cesm106_cam4/*.nc")[:1]
 
@@ -16,11 +17,6 @@ import numpy as np
 # print(outs)
 
 from gaia.training import (
-    run,
-    compute_stats,
-    construct_data,
-    predict,
-    test,
     main,
     default_trainer_params,
     default_dataset_params,
@@ -41,15 +37,46 @@ from gaia.training import (
 
 # run(gpus=[4], lr = 1e-3, num_layers=7, batch_size=24*96*144,optimizer="lamb")
 
-# main("train", trainer_params = default_trainer_params(gpus=[3]),
-#               dataset_params = default_dataset_params(subsample_factor=1),
-#               model_params =   default_model_params(lr = 1e-3))
+ckpt = "lightning_logs/version_3/checkpoints/epoch=999-step=78999.ckpt"
+
+w = np.zeros(53)
+w[:5] = 1.
+w = w.tolist()
+
+# model_config={
+#             "model_type": "fcn",
+#             "num_layers": 1,
+#         }
+
+main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
+              dataset_params = default_dataset_params(subsample_factor=8, batch_size = 24*96*144, seperate_val_set=False, flatten=True),
+              model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, loss_output_weights = w))
 
 # ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
-ckpt = "lightning_logs_old/version_12/checkpoints/epoch=854-step=478799.ckpt"
-main("test", trainer_params = default_trainer_params(gpus=[3]),
-             dataset_params = default_dataset_params(subsample_factor=1, interleave=False),
-             model_params =   default_model_params(ckpt=ckpt))
+# ckpt = "lightning_logs_old/version_12/checkpoints/epoch=854-step=478799.ckpt"
+# ckpt = "lightning_logs_old/version_2/checkpoints/epoch=224-step=141299.ckpt"
+
+# model_config = {
+#     "input_size": 130,
+#     "model_type": "conv",
+#     "output_size": 79,
+#     "num_layers": 7,
+# }
+
+# main(
+#     "test",
+#     trainer_params=default_trainer_params(gpus=[7],precision=16),
+#     dataset_params=default_dataset_params(
+#         # batch_size=24,
+#         subsample_factor=8, batch_size = 24*96*144,
+#         interleave=True,
+#         # outputs=["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"],
+#     ),
+#     model_params=default_model_params(
+#         ckpt=ckpt,
+#         # model_config=model_config,data_stats = None,
+#     ),
+# )
 
 
 # model_params

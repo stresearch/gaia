@@ -21,6 +21,8 @@ class TrainingModel(LightningModule):
         model_config=dict(model_type="fcn"),
         data_stats=None,
         use_output_scaling=True,
+        replace_std_with_range=False,
+        loss_output_weights=None,
         **kwargs,
     ):
         super().__init__()
@@ -40,6 +42,12 @@ class TrainingModel(LightningModule):
             raise ValueError("unknown model_type")
 
         self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
+
+        if loss_output_weights is not None:
+            logger.info(f"using output weights {loss_output_weights}")
+            w = torch.tensor(loss_output_weights)
+            w *= w.shape[0] / w.sum()
+            self.register_buffer("loss_output_weights", w)
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -73,7 +81,7 @@ class TrainingModel(LightningModule):
             logger.warning("logger using predefined output scaling")
             output_norm = self.get_predefined_output_normalization()
         else:
-            output_norm = self.get_normalization(stats["output_stats"])
+            output_norm = self.get_normalization(stats["output_stats"], zero_mean=True)
 
         return input_norm, output_norm
 
@@ -96,13 +104,25 @@ class TrainingModel(LightningModule):
 
         return Normalization(mean, std)
 
-    def get_normalization(self, stats):
-        thr = 1e-9
-        stats["range"] = torch.maximum(
-            stats["max"] - stats["mean"], stats["mean"] - stats["min"]
-        )
-        stats["std_eff"] = torch.where(stats["std"] > thr, stats["std"], stats["range"])
-        return Normalization(stats["mean"], stats["std_eff"])
+    def get_normalization(self, stats, zero_mean=False):
+        if self.hparams.replace_std_with_range:
+            thr = 1e-9
+            stats["range"] = torch.maximum(
+                stats["max"] - stats["mean"], stats["mean"] - stats["min"]
+            )
+            stats["std_eff"] = torch.where(
+                stats["std"] > thr, stats["std"], stats["range"]
+            )
+            mn = stats["mean"]
+            std = stats["std_eff"]
+        else:
+            mn = stats["mean"]
+            std = stats["std"]
+
+        if zero_mean:
+            mn = torch.zeros_like(std)
+
+        return Normalization(mn, std)
 
     def configure_optimizers(self):
         if self.hparams.optimizer == "adam":
@@ -122,7 +142,7 @@ class TrainingModel(LightningModule):
         if len(x.shape) == 2:
             reduce_dims = [0]
         elif len(x.shape) == 4:
-            reduce_dims = [0,2,3]
+            reduce_dims = [0, 2, 3]
         else:
             raise ValueError("wrong size of x")
 
@@ -130,34 +150,36 @@ class TrainingModel(LightningModule):
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
 
-        # if mode in ["test","val"]:
 
-        # for k, v in self.hparams.output_index.items():
-        #     loss_name = f"mse_{k}"
-        #     loss[loss_name] = F.mse_loss(
-        #         yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
-        #     )
-        #     w = 1.0
-        #     loss["mse"] += w * loss[loss_name]
-        #     self.log(
-        #         f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
-        #     )
-
-        if mode in ["test", "val"]:
-            loss["skill_ave_clipped"] = (
-                (1.0 - mse.mean(reduce_dims) / y.var(reduce_dims, unbiased=False)).clip(0, 1).mean()
+        with torch.no_grad():
+            skill = (
+                (1.0 - mse.mean(reduce_dims) / y.var(reduce_dims, unbiased=False))
+                .clip(0, 1)
             )
+
+            if self.hparams.loss_output_weights is not None:
+                skill = skill * self.loss_output_weights
+
+            loss["skill_ave_clipped"] = skill.mean()
 
             if mode == "test":
                 for k, v in self.hparams.output_index.items():
                     loss_name = f"skill_ave_trunc_{k}"
                     y_v = y[:, v[0] : v[1], ...]
                     mse_v = mse[:, v[0] : v[1], ...]
-                    loss[loss_name] = (
-                        (1.0 - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False))
-                        .clip(0, 1)
-                        .mean()
-                    )
+
+                    skill = (
+                        1.0 - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False)
+                    ).clip(0, 1)
+
+                    loss[loss_name] = skill.mean()
+
+                    for i in range(skill.shape[0]):
+                        loss_name = f"skill_ave_trunc_{k}_{i:02}"
+                        loss[loss_name] = skill[i]
+
+        if self.hparams.loss_output_weights is not None:
+            mse = mse * self.loss_output_weights[None, :]
 
         loss["mse"] = mse.mean()
         for k, v in loss.items():
@@ -248,6 +270,9 @@ class FcnBaseline(torch.nn.Module):
         self.model = self.make_model()
 
     def make_model(self):
+        if self.num_layers == 1:
+            return torch.nn.Linear(self.input_size, self.output_size)
+
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
                 torch.nn.Linear(ins, outs),

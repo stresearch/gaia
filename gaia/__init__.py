@@ -5,9 +5,10 @@ import os
 
 import logging
 import sys
-APP_LOGGER_NAME = 'gaia'
 
-file_name=None
+APP_LOGGER_NAME = "gaia"
+
+file_name = None
 logger = logging.getLogger(APP_LOGGER_NAME)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -22,8 +23,8 @@ if file_name:
     logger.addHandler(fh)
 
 
-def get_logger(module_name):    
-   return logging.getLogger(APP_LOGGER_NAME).getChild(module_name)
+def get_logger(module_name):
+    return logging.getLogger(APP_LOGGER_NAME).getChild(module_name)
 
 
 

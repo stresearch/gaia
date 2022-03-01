@@ -1,12 +1,8 @@
-from asyncio import base_tasks
 from math import prod
 from random import shuffle
-from re import L, X
 import shutil
 from typing import Union
 from collections import OrderedDict
-from sklearn.datasets import load_files
-from sklearn.neighbors import VALID_METRICS
 import torch
 from torch.utils.data import (
     DataLoader,
@@ -393,7 +389,6 @@ class NCDataConstructor:
         if self.s3_client_kwargs is not None:
             self.file_location = "s3"
 
-
         self.inputs = inputs
         self.outputs = outputs
 
@@ -409,7 +404,7 @@ class NCDataConstructor:
         split="train",
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
-        save_location = "."
+        save_location=".",
     ):
 
         ## get files
@@ -431,7 +426,7 @@ class NCDataConstructor:
         if split == "train":
             files = files[: 365 * 2]
         else:
-            files = files[365 * 2:]
+            files = files[365 * 2 :]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
@@ -441,47 +436,64 @@ class NCDataConstructor:
         data_constructor = cls(
             inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT".split(","),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten = split == "train",
+            flatten=split == "train",
             subsample_factor=8,
             compute_stats=True,
             cache="/ssddg1/gaia/cache",
             s3_client_kwargs=s3_client_kwargs,
-            )
+        )
 
         # data_constructor.load_files(files[:2], "temp.pt")
 
         dataset_name = files[0].split("/")[-2]
-        out = data_constructor.load_files_parallel(files[:2], num_workers = 2, save_file=None)
+        out = data_constructor.load_files_parallel(
+            files[:2], num_workers=2, save_file=None
+        )
 
         if split == "train":
-            
-            #lets make dedicated train and val so that we dont have to worry about it anymore
+
+            # lets make dedicated train and val so that we dont have to worry about it anymore
             x = out.pop("x")
             y = out.pop("y")
 
-            mask = torch.rand(x.shape[0])>.1 #.9 train
+            mask = torch.rand(x.shape[0]) > 0.1  # .9 train
 
-            xtrain = x[mask,...]
-            ytrain = y[mask,...]
+            xtrain = x[mask, ...]
+            ytrain = y[mask, ...]
 
             out["x"] = xtrain
             out["y"] = ytrain
 
-            torch.save(out,os.path.join(save_location, f"{dataset_name}_{data_constructor.subsample_factor}_train.pt"))
+            torch.save(
+                out,
+                os.path.join(
+                    save_location,
+                    f"{dataset_name}_{data_constructor.subsample_factor}_train.pt",
+                ),
+            )
 
-            xval = x[~mask,...]
-            yval = y[~mask,...]
+            xval = x[~mask, ...]
+            yval = y[~mask, ...]
 
             out["x"] = xval
             out["y"] = yval
 
-            torch.save(out,os.path.join(save_location, f"{dataset_name}_{data_constructor.subsample_factor}_val.pt"))
+            torch.save(
+                out,
+                os.path.join(
+                    save_location,
+                    f"{dataset_name}_{data_constructor.subsample_factor}_val.pt",
+                ),
+            )
 
         else:
-            torch.save(out,os.path.join(save_location, f"{dataset_name}_{data_constructor.subsample_factor}_test.pt"))
-
-
-
+            torch.save(
+                out,
+                os.path.join(
+                    save_location,
+                    f"{dataset_name}_{data_constructor.subsample_factor}_test.pt",
+                ),
+            )
 
     def get_input_index(self, dataset):
         if self.input_index is not None:
@@ -554,7 +566,7 @@ class NCDataConstructor:
             return self.read_disk_file(local_file)
         else:
             logger.info(f"downloading {local_file}")
-            s3_client = boto3.client("s3",**self.s3_client_kwargs)
+            s3_client = boto3.client("s3", **self.s3_client_kwargs)
             s3_client.download_file(
                 Bucket=bucket_name, Key=object_key, Filename=local_file
             )
@@ -568,8 +580,6 @@ class NCDataConstructor:
         x = self.load_variables(self.inputs, dataset)
         y = self.load_variables(self.outputs, dataset)
 
-       
-
         # will only
         self.get_input_index(dataset)
         self.get_output_index(dataset)
@@ -579,12 +589,12 @@ class NCDataConstructor:
                 x, y, subsample_factor=self.subsample_factor
             )
 
-         #
+        #
         self.clean_up_file(dataset)
 
         return x, y, new_index
 
-    def clean_up_file(self,dataset):
+    def clean_up_file(self, dataset):
         temp_file = dataset.filepath()
         dataset.close()
         logger.info(f"removing temp file {temp_file}")
@@ -633,7 +643,7 @@ class NCDataConstructor:
 
         return out
 
-    def load_files_parallel(self, files, num_workers=8, save_file = None):
+    def load_files_parallel(self, files, num_workers=8, save_file=None):
         x = [None] * len(files)
         y = [None] * len(files)
         index = [None] * len(files)

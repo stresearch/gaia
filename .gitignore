@@ -122,3 +122,4 @@ lightning_logs*/*
 stats.pt
 *.pt
 *.html
+*.nc

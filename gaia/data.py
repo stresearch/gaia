@@ -373,6 +373,7 @@ class NCDataConstructor:
         compute_stats=True,
         cache=".",
         s3_client_kwargs=None,
+        time_steps = 2,
     ):
 
         self.flatten = flatten
@@ -385,6 +386,7 @@ class NCDataConstructor:
         self.subsample_factor = subsample_factor
         self.cache = cache
         self.s3_client_kwargs = s3_client_kwargs
+        self.time_steps = time_steps
 
         if self.s3_client_kwargs is not None:
             self.file_location = "s3"
@@ -434,10 +436,10 @@ class NCDataConstructor:
         )
 
         data_constructor = cls(
-            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT".split(","),
+            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(","),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
             flatten=split == "train",
-            subsample_factor=8,
+            subsample_factor=4,
             compute_stats=True,
             cache="/ssddg1/gaia/cache",
             s3_client_kwargs=s3_client_kwargs,
@@ -540,7 +542,13 @@ class NCDataConstructor:
             dim=self.channel_dim,
         )
 
-        num_channels = v.shape[self.channel_dim]
+        num_samples, num_channels, num_lons, num_lats = v.shape
+
+        if self.time_steps>1:
+            v = v.reshape(-1, self.time_steps, num_channels, num_lons, num_lats)
+
+            if self.flatten:
+                v = v.permute([0, 3, 4, 1, 2]).reshape(-1, self.time_steps, num_channels)
 
         if self.flatten:
             v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
@@ -562,10 +570,10 @@ class NCDataConstructor:
         object_key = "/".join(temp[1:])
         local_file = os.path.join(self.cache, file_name)
         if os.path.exists(local_file):
-            logger.info(f"local file {local_file} exists")
+            # logger.info(f"local file {local_file} exists")
             return self.read_disk_file(local_file)
         else:
-            logger.info(f"downloading {local_file}")
+            # logger.info(f"downloading {local_file}")
             s3_client = boto3.client("s3", **self.s3_client_kwargs)
             s3_client.download_file(
                 Bucket=bucket_name, Key=object_key, Filename=local_file

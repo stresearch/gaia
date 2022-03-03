@@ -373,7 +373,7 @@ class NCDataConstructor:
         compute_stats=True,
         cache=".",
         s3_client_kwargs=None,
-        time_steps = 1,
+        time_steps=1,
     ):
 
         self.flatten = flatten
@@ -436,14 +436,16 @@ class NCDataConstructor:
         )
 
         data_constructor = cls(
-            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(","),
+            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
+                ","
+            ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
             flatten=split == "train",
             subsample_factor=4,
             compute_stats=True,
             cache="/ssddg1/gaia/cache",
             s3_client_kwargs=s3_client_kwargs,
-            time_steps = 1
+            time_steps=2,
         )
 
         # data_constructor.load_files(files[:2], "temp.pt")
@@ -545,14 +547,16 @@ class NCDataConstructor:
 
         num_samples, num_channels, num_lons, num_lats = v.shape
 
-        if self.time_steps>1:
+        if self.time_steps > 1:
             v = v.reshape(-1, self.time_steps, num_channels, num_lons, num_lats)
 
             if self.flatten:
-                v = v.permute([0, 3, 4, 1, 2]).reshape(-1, self.time_steps, num_channels)
-
-        if self.flatten:
-            v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
+                v = v.permute([0, 3, 4, 1, 2]).reshape(
+                    -1, self.time_steps, num_channels
+                )
+        else:
+            if self.flatten:
+                v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
 
         return v
 
@@ -606,7 +610,7 @@ class NCDataConstructor:
     def clean_up_file(self, dataset):
         temp_file = dataset.filepath()
         dataset.close()
-        logger.info(f"removing temp file {temp_file}")
+        # logger.info(f"removing temp file {temp_file}")
         os.remove(temp_file)
 
     def subsample_data(self, xi, yi, subsample_factor):
@@ -693,16 +697,17 @@ class NCDataConstructor:
 
         return out
 
-    @staticmethod
-    def get_stats(x):
+    def get_stats(self,x):
         logger.info(f"computing stats for tensor of shape {x.shape}")
         outs = dict()
-        if len(x.shape) == 4:
-            reduce_dims = [0, 2, 3]
-        elif len(x.shape) == 2:
-            reduce_dims = [0]
-        else:
-            raise ValueError("only 2D or 4D shapes supported")
+
+        channel_dim = 1
+
+        if self.time_steps > 1:
+            channel_dim = 2
+
+        reduce_dims = [i for i in range(len(x.shape)) if i != channel_dim]
+        
 
         outs["mean"] = x.mean(dim=reduce_dims)
         outs["std"] = x.std(dim=reduce_dims)

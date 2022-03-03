@@ -373,7 +373,7 @@ class NCDataConstructor:
         compute_stats=True,
         cache=".",
         s3_client_kwargs=None,
-        time_steps = 2,
+        time_steps = 1,
     ):
 
         self.flatten = flatten
@@ -443,6 +443,7 @@ class NCDataConstructor:
             compute_stats=True,
             cache="/ssddg1/gaia/cache",
             s3_client_kwargs=s3_client_kwargs,
+            time_steps = 1
         )
 
         # data_constructor.load_files(files[:2], "temp.pt")

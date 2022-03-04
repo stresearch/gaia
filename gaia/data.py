@@ -451,12 +451,12 @@ class NCDataConstructor:
 
         dataset_name = files[0].split("/")[-2]
 
-        out = data_constructor.load_files(files, save_file=None)
+        # out = data_constructor.load_files(files, save_file=None)
 
 
-        # out = data_constructor.load_files_parallel(
-        #     files[:16], num_workers=8, save_file=None
-        # )
+        out = data_constructor.load_files_parallel(
+            files, num_workers=8, save_file=None
+        )
 
         if split == "train":
 
@@ -592,27 +592,35 @@ class NCDataConstructor:
         return netCDF4_Dataset(file, "r", format="NETCDF4")
 
     def load_file(self, file, cache_file = None):
-        dataset = self.read_data(file)
-        x = self.load_variables(self.inputs, dataset)
-        y = self.load_variables(self.outputs, dataset)
 
-        # will only
-        self.get_input_index(dataset)
-        self.get_output_index(dataset)
+        try:
+            dataset = self.read_data(file)
+            x = self.load_variables(self.inputs, dataset)
+            y = self.load_variables(self.outputs, dataset)
 
-        if self.subsample_factor > 1:
-            x, y, new_index = self.subsample_data(
-                x, y, subsample_factor=self.subsample_factor
-            )
+            # will only
+            self.get_input_index(dataset)
+            self.get_output_index(dataset)
 
-        #
-        self.clean_up_file(dataset)
+            if self.subsample_factor > 1:
+                x, y, new_index = self.subsample_data(
+                    x, y, subsample_factor=self.subsample_factor
+                )
 
-        if cache_file is not None:
-            torch.save([x, y, new_index], cache_file)
-            return cache_file
+            #
+            self.clean_up_file(dataset)
 
-        return x, y, new_index
+            if cache_file is not None:
+                torch.save([x, y, new_index], cache_file)
+                return cache_file
+
+            return x, y, new_index
+
+
+        except Exception as e:
+            logger.exception(e)
+            logger.warning(f"failed {file}")
+            return
 
     def clean_up_file(self, dataset):
         temp_file = dataset.filepath()
@@ -630,11 +638,18 @@ class NCDataConstructor:
 
     def load_files(self, files, save_file=None):
 
+        
+
         x = []
         y = []
         index = []
         for file in tqdm.tqdm(files):
-            xi, yi, indexi = self.load_file(file)
+            try:
+                xi, yi, indexi = self.load_file(file)
+            except Exception as e:
+                logger.exception(e)
+                logger.warning(f"failed {file}")
+
             x.append(xi)
             y.append(yi)
             index.append(indexi)
@@ -662,30 +677,62 @@ class NCDataConstructor:
             torch.save(out, save_file)
 
         return out
+        
 
     def load_files_parallel(self, files, num_workers=8, save_file=None):
         x = []
         y = [] 
         index = []
 
+        # def load_file_wrapper(*args,**kwargs):
+        #     try:
+        #         return self.load_file(*args,**kwargs)
+        #     except Exception as e:
+        #         logger.exception(e)
+        #         logger.warning(f"failed {args}, {kwargs}")
+        #         return
+
+        logger.info("downloading files")
+
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
 
+           
+
             cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
-            out = exec.map(self.load_file,files,cache_files)
-            # list(out)
 
+            futs  = []
 
+            for f,cf in zip(files,cache_files):
+                if os.path.exists(cf):
+                    #skip and continue
+                    continue
+                fut = exec.submit(self.load_file,f,cf)
+                futs.append(fut)
 
-        for f in sorted(cache_files):
+            for fut in tqdm.tqdm(as_completed(futs),total = len(files)):
+                try:
+                    fut.result()
+                except Exception as e:
+                    logger.exception(e)
+
+            
+        logger.info("merging files")
+
+        for f in tqdm.tqdm(sorted(cache_files)):
             if os.path.exists(f):
-                xi,yi,indexi = torch.load(f)
+                try:
+                    xi,yi,indexi = torch.load(f)
+                except Exception as e:
+                    logger.exception(e)
+                    logger.warning(f"failed {f}")
+                    continue
             else:
                 logger.warning(f"no file {f}")
                 continue
             x.append(xi)
             y.append(yi)
             index.append(indexi)
-            os.remove(f)
+            
 
         x = torch.cat(x)
         y = torch.cat(y)
@@ -709,6 +756,11 @@ class NCDataConstructor:
         if save_file is not None:
             torch.save(out, save_file)
 
+        # logger.info("erasing temp files")
+        # for f in tqdm.tqdm(sorted(cache_files)):
+        #     if os.path.exists(f):
+        #         os.remove(f)
+                
         return out
 
     def get_stats(self,x):

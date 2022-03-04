@@ -295,6 +295,68 @@ class FcnBaseline(torch.nn.Module):
         return self.model(x)
 
 
+class FcnBaselineHistory(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        time_steps: int = 1,
+        model_type=None,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.time_steps = time_steps
+        self.main_layers = self.make_layers()
+        self.output_history_layer = torch.nn.Linear(self.output_size, self.hidden_size)
+        self.non_linear_ops = torch.nn.Sequential(
+                torch.nn.BatchNorm1d(self.hidden_size),
+                torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+        self.output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
+
+
+
+    def make_layers(self):
+        if self.num_layers == 1:
+            return torch.nn.Linear(self.input_size, self.output_size)
+
+        def make_layer(ins, outs):
+            layer = torch.nn.Sequential(
+                torch.nn.Linear(ins, outs),
+                torch.nn.BatchNorm1d(outs),
+                torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+            return layer
+
+        input_layer = make_layer(self.input_size, self.hidden_size)
+        intermediate_layers = [
+            make_layer(self.hidden_size, self.hidden_size)
+            for _ in range(self.num_layers - 3)
+        ]
+        output_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
+        layers = [input_layer] + intermediate_layers + [output_layer]
+        return torch.nn.Sequential(*layers)
+
+    def forward(self, inputs):
+        x, yh = inputs
+        h1 =  self.main_layers(x)
+        h2 = self.output_history_layer(yh)
+        h = self.non_linear_ops(h1 + h2)
+        y = self.output_layer(h)
+        return y
+
+
 class ConvNet1x1(torch.nn.Module):
     def __init__(
         self,

@@ -443,17 +443,20 @@ class NCDataConstructor:
             flatten=split == "train",
             subsample_factor=4,
             compute_stats=True,
-            cache="/ssddg1/gaia/cache",
+            cache=".",
             s3_client_kwargs=s3_client_kwargs,
             time_steps=2,
         )
 
-        # data_constructor.load_files(files[:2], "temp.pt")
 
         dataset_name = files[0].split("/")[-2]
-        out = data_constructor.load_files_parallel(
-            files[:2], num_workers=2, save_file=None
-        )
+
+        out = data_constructor.load_files(files, save_file=None)
+
+
+        # out = data_constructor.load_files_parallel(
+        #     files[:16], num_workers=8, save_file=None
+        # )
 
         if split == "train":
 
@@ -588,7 +591,7 @@ class NCDataConstructor:
     def read_disk_file(self, file):
         return netCDF4_Dataset(file, "r", format="NETCDF4")
 
-    def load_file(self, file):
+    def load_file(self, file, cache_file = None):
         dataset = self.read_data(file)
         x = self.load_variables(self.inputs, dataset)
         y = self.load_variables(self.outputs, dataset)
@@ -604,6 +607,10 @@ class NCDataConstructor:
 
         #
         self.clean_up_file(dataset)
+
+        if cache_file is not None:
+            torch.save([x, y, new_index], cache_file)
+            return cache_file
 
         return x, y, new_index
 
@@ -657,21 +664,28 @@ class NCDataConstructor:
         return out
 
     def load_files_parallel(self, files, num_workers=8, save_file=None):
-        x = [None] * len(files)
-        y = [None] * len(files)
-        index = [None] * len(files)
+        x = []
+        y = [] 
+        index = []
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
-            fs = dict()
-            for i, file in enumerate(files):
-                f = exec.submit(self.load_file, file)
-                fs[f] = i
 
-            for f in tqdm.tqdm(as_completed(fs), total=len(files)):
-                xi, yi, indexi = f.result()
-                x[fs[f]] = xi
-                y[fs[f]] = yi
-                index[fs[f]] = indexi
+            cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
+            out = exec.map(self.load_file,files,cache_files)
+            # list(out)
+
+
+
+        for f in sorted(cache_files):
+            if os.path.exists(f):
+                xi,yi,indexi = torch.load(f)
+            else:
+                logger.warning(f"no file {f}")
+                continue
+            x.append(xi)
+            y.append(yi)
+            index.append(indexi)
+            os.remove(f)
 
         x = torch.cat(x)
         y = torch.cat(y)

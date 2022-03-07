@@ -351,12 +351,44 @@ class NcIterableDataset(IterableDataset):
         return outs
 
 
-def flatten(x):
-    return x.permute([0, 2, 3, 1]).reshape(-1, x.shape[1])
+def flatten(v):
+    # return x.permute([0, 2, 3, 1]).reshape(-1, x.shape[1])
+
+    if len(v.shape) == 4:
+        num_samples, num_channels, num_lons, num_lats = v.shape
+        time_steps = 1
+    elif len(v.shape) == 5:
+        num_samples, time_steps, num_channels, num_lons, num_lats = v.shape
+
+    else:
+        raise ValueError(f"shape {v.shape} not supported")
+
+    if time_steps > 1:
+        v = v.permute([0, 3, 4, 1, 2]).reshape(
+                -1, time_steps, num_channels
+            )
+    else:
+        v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
+
+    return v
 
 
-def unflatten(x):
-    return x.reshape(-1, 96, 144, x.shape[1]).permute([0, 3, 1, 2])
+def unflatten(v):
+    if len(v.shape) == 2:
+        num_samples, num_channels = v.shape
+        time_steps = 1
+    elif len(v.shape) == 3:
+        num_samples, time_steps, num_channels = v.shape
+    else:
+        raise ValueError(f"shape {v.shape} not supported")
+
+    if time_steps > 1:
+        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4,  1, 2])
+    else:
+
+         v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
+
+    return v
 
 
 class NCDataConstructor:
@@ -406,7 +438,7 @@ class NCDataConstructor:
         split="train",
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
-        save_location=".",
+        save_location="/ssddg1/gaia/spcam",
     ):
 
         ## get files
@@ -443,7 +475,7 @@ class NCDataConstructor:
             flatten=split == "train",
             subsample_factor=4,
             compute_stats=True,
-            cache=".",
+            cache="/ssddg1/gaia/spcam/test",
             s3_client_kwargs=s3_client_kwargs,
             time_steps=2,
         )
@@ -782,7 +814,7 @@ class NCDataConstructor:
         return outs
 
 
-def get_dataset(
+def get_dataset_v1(
     files=None,
     subsample_factor=12,
     batch_size=1024,
@@ -860,6 +892,35 @@ def get_dataset(
 
     return dataset_dict, data_loader
 
+
+def get_dataset(
+    dataset_file,
+    batch_size=1024,
+    flatten=False,
+    shuffle = False
+):
+
+    dataset_dict = torch.load(dataset_file)
+
+    var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
+    dataset_dict.update(var_index)
+
+    del dataset_dict["index"]
+
+    if flatten:
+        logger.warning("flattening dataset")
+        for v in ["x", "y"]:
+            dataset_dict[v] = flatten(dataset_dict[v])
+
+    data_loader = DataLoader(
+        FastTensorDataset(
+            dataset_dict["x"], dataset_dict["y"], batch_size=batch_size, shuffle=shuffle
+        ),
+        batch_size=None,
+        pin_memory=True,
+    )
+
+    return dataset_dict, data_loader
 
 class FastTensorDataset(IterableDataset):
     """

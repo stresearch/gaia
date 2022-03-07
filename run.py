@@ -37,20 +37,30 @@ from gaia.training import (
 
 # run(gpus=[4], lr = 1e-3, num_layers=7, batch_size=24*96*144,optimizer="lamb")
 
-ckpt = "lightning_logs/version_3/checkpoints/epoch=999-step=78999.ckpt"
+# ckpt = "lightning_logs/version_3/checkpoints/epoch=999-step=78999.ckpt"
 
-w = np.zeros(53)
-w[:5] = 1.
-w = w.tolist()
+# w = np.zeros(53)
+# w[:5] = 1.
+# w = w.tolist()
 
 # model_config={
 #             "model_type": "fcn",
 #             "num_layers": 1,
 #         }
 
+# main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
+#               dataset_params = default_dataset_params(subsample_factor=8, batch_size = 24*96*144, seperate_val_set=False, flatten=True),
+#               model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, loss_output_weights = w))
+
+model_config={
+            "model_type": "fcn",
+            "num_layers": 7,
+        }
+
 main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
-              dataset_params = default_dataset_params(subsample_factor=8, batch_size = 24*96*144, seperate_val_set=False, flatten=True),
-              model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, loss_output_weights = w))
+              dataset_params = default_dataset_params(),
+              model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))#, loss_output_weights = w))
+
 
 # ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
 # ckpt = "lightning_logs_old/version_12/checkpoints/epoch=854-step=478799.ckpt"

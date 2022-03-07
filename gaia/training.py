@@ -1,5 +1,6 @@
 from asyncio.log import logger
 from collections import OrderedDict
+from gc import callbacks
 import json
 import os
 from gaia.models import ComputeStats, TrainingModel
@@ -15,6 +16,8 @@ import glob
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
+
 
 from gaia import get_logger
 
@@ -33,6 +36,9 @@ def update_model_params_from_dataset(dataset_dict, model_params):
         }
     )
 
+
+    
+
     model_params.update(
         dict(
             input_index=dataset_dict["input_index"],
@@ -40,6 +46,14 @@ def update_model_params_from_dataset(dataset_dict, model_params):
             data_stats=dataset_dict["stats"],
         )
     )
+
+    mean_thres = 1e-15
+    ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
+    loss_output_weights = torch.ones(ignore_outputs.shape[0])
+    loss_output_weights[ignore_outputs] = 0.
+    logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
+
+    model_params["loss_output_weights"] = loss_output_weights.tolist()
 
 
 def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
@@ -91,8 +105,34 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
 
             return train_files, test_files, test_files
 
-
 def default_dataset_params(
+    batch_size=24 * 96 * 144,
+):
+    base = "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4"
+    
+    return dict(
+        train=dict(
+            dataset_file=base+"_train.pt",
+            batch_size=batch_size,
+            shuffle=True,
+            flatten=False #already flattened
+        ),
+        val=dict(
+            dataset_file=base+"_val.pt",
+            batch_size=batch_size,
+            shuffle=False,
+            flatten=False #already flattened
+        ),
+        test=dict(
+            dataset_file=base+"_test.pt",
+            batch_size=batch_size,
+            shuffle=False,
+            flatten=True #already flattened
+        ),
+    )
+
+
+def default_dataset_params_v1(
     batch_size=24 * 96 * 144,
     subsample_factor=12,
     flatten=True,
@@ -148,7 +188,7 @@ def default_model_params(**kwargs):
         lr=1e-3,
         optimizer="adam",
         model_config={
-            "model_type": "fcn",
+            "model_type": "fcn_history",
             "num_layers": 7,
         },
     )
@@ -187,15 +227,21 @@ def main(
     logger.info(f"model_params: \n{make_pretty_for_log(model_params)}")
 
     if mode == "train":
-        train_dataset, train_dataloader, val_dataloader = get_dataset(**dataset_params["train"], split_fraction=.1)
+        train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
+        val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+
         # val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
         # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
 
         
         update_model_params_from_dataset(train_dataset, model_params)
 
+
         model = TrainingModel(dataset_params=dataset_params, **model_params)
-        trainer = pl.Trainer(max_epochs = 2000,
+
+        checkpoint_callback = ModelCheckpoint(monitor="val_mse",mode="min")
+
+        trainer = pl.Trainer(max_epochs = 2000, callbacks=[checkpoint_callback],
             log_every_n_steps=max(1, len(train_dataloader) // 100), **trainer_params
         )
 
@@ -204,6 +250,8 @@ def main(
             ckpt = model_params["ckpt"]
         else:
             ckpt = None
+
+
 
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
 

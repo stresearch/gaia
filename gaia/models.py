@@ -20,7 +20,7 @@ class TrainingModel(LightningModule):
         output_index=None,
         model_config=dict(model_type="fcn"),
         data_stats=None,
-        use_output_scaling=True,
+        use_output_scaling=False,
         replace_std_with_range=False,
         loss_output_weights=None,
         **kwargs,
@@ -38,6 +38,8 @@ class TrainingModel(LightningModule):
             self.model = FcnBaseline(**model_config)
         elif model_type == "conv":
             self.model = ConvNet1x1(**model_config)
+        elif model_type == "fcn_history":
+            self.model = FcnHistory(**model_config)
         else:
             raise ValueError("unknown model_type")
 
@@ -48,6 +50,12 @@ class TrainingModel(LightningModule):
             w = torch.tensor(loss_output_weights)
             w *= w.shape[0] / w.sum()
             self.register_buffer("loss_output_weights", w)
+
+        # if min_mean_thres is not None:
+        #     if loss_output_weights is not None:
+        #         raise ValueError("max_mean_threshold and loss_output_weights cant be both not None")
+        #     outputs_to_ignore = self.output_normalize.std 
+
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -134,14 +142,43 @@ class TrainingModel(LightningModule):
     def forward(self, x):
         return self.model(x)
 
-    def step(self, batch, mode="train"):
-        x, y = batch
-        x = self.input_normalize(x)
-        y = self.output_normalize(y)
+    def handle_batch(self, batch):
+        x,y = batch
+        num_dims = len(x.shape)
 
-        if len(x.shape) == 2:
+        if num_dims == 3 or num_dims == 5:
+
+            # have history
+            x = x[:,-1,...] #only use last time stemps for state vars
+            y1 = y[:,0,...]
+            y2 = y[:,1,...]
+            x = self.input_normalize(x)
+            y2 = self.output_normalize(y2)
+
+            if self.hparams.model_config["model_type"] == "fcn_history":
+                y1 = self.output_normalize(y1)
+                return [x,y1],y2
+            else:
+                # dont use history
+                return x,y2
+
+        else:
+            x = self.input_normalize(x)
+            y = self.output_normalize(y)
+            return x,y
+
+
+
+    def step(self, batch, mode="train"):
+        # x, y = batch
+        # x = self.input_normalize(x)
+        # y = self.output_normalize(y)
+
+        x,y = self.handle_batch(batch)
+
+        if len(y.shape) == 2:
             reduce_dims = [0]
-        elif len(x.shape) == 4:
+        elif len(y.shape) == 4:
             reduce_dims = [0, 2, 3]
         else:
             raise ValueError("wrong size of x")
@@ -242,8 +279,7 @@ class TrainingModel(LightningModule):
         self.log(f"{mode}_mse_u", loss[f"mse_u"], on_epoch=True)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
-        x, y = batch
-        x = self.input_normalize(x)
+        x, y = self.handle_batch(batch)
         yhat = self(x)
         yhat = self.output_normalize(yhat, normalize=False)  # denormalize
         return yhat.cpu()
@@ -295,7 +331,7 @@ class FcnBaseline(torch.nn.Module):
         return self.model(x)
 
 
-class FcnBaselineHistory(torch.nn.Module):
+class FcnHistory(torch.nn.Module):
     def __init__(
         self,
         input_size: int = 26 * 2,

@@ -23,6 +23,8 @@ from gaia.training import (
     default_model_params,
 )
 
+from gaia.plot import plot_results
+
 
 # compute_stats()
 # run(flatten = False, gpus=[3], lr = 1e-3, num_layers=3)
@@ -57,9 +59,16 @@ model_config={
             "num_layers": 7,
         }
 
-main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
-              dataset_params = default_dataset_params(),
-              model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))#, loss_output_weights = w))
+# main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
+#               dataset_params = default_dataset_params(),
+#               model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))#, loss_output_weights = w))
+
+
+# main("predict", trainer_params = default_trainer_params(gpus=[3],precision=16),
+#               dataset_params = default_dataset_params(),
+#               model_params = dict(ckpt ="/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_1"))
+
+
 
 
 # ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
@@ -111,3 +120,6 @@ main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
 
 
 # predict(gpus=[3])
+
+
+plot_results("lightning_logs/version_1")

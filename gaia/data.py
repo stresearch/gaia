@@ -351,7 +351,7 @@ class NcIterableDataset(IterableDataset):
         return outs
 
 
-def flatten(v):
+def flatten_tensor(v):
     # return x.permute([0, 2, 3, 1]).reshape(-1, x.shape[1])
 
     if len(v.shape) == 4:
@@ -373,7 +373,7 @@ def flatten(v):
     return v
 
 
-def unflatten(v):
+def unflatten_tensor(v):
     if len(v.shape) == 2:
         num_samples, num_channels = v.shape
         time_steps = 1
@@ -910,7 +910,7 @@ def get_dataset(
     if flatten:
         logger.warning("flattening dataset")
         for v in ["x", "y"]:
-            dataset_dict[v] = flatten(dataset_dict[v])
+            dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
     data_loader = DataLoader(
         FastTensorDataset(

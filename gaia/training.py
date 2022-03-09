@@ -1,6 +1,4 @@
-from asyncio.log import logger
 from collections import OrderedDict
-from gc import callbacks
 import json
 import os
 from gaia.models import ComputeStats, TrainingModel
@@ -10,7 +8,7 @@ from gaia.data import (
     NcIterableDataset,
     FastTensorDataset,
     get_dataset,
-    unflatten,
+    unflatten_tensor,
 )
 import glob
 from torch.utils.data import DataLoader
@@ -24,7 +22,17 @@ from gaia import get_logger
 logger = get_logger(__name__)
 
 
-
+def get_checkpoint_file(file):
+    if file.endswith(".ckpt"):
+        return file
+    else:
+        # assume its a directory
+        pattern = os.path.join(file, "checkpoints", "*.ckpt")
+        files = glob.glob(pattern)
+        if len(files) > 0:
+            return files[0]
+        else:
+            raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
 def update_model_params_from_dataset(dataset_dict, model_params):
@@ -35,9 +43,6 @@ def update_model_params_from_dataset(dataset_dict, model_params):
             "output_size": dataset_dict["y"].shape[-1],
         }
     )
-
-
-    
 
     model_params.update(
         dict(
@@ -50,13 +55,13 @@ def update_model_params_from_dataset(dataset_dict, model_params):
     mean_thres = 1e-15
     ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
     loss_output_weights = torch.ones(ignore_outputs.shape[0])
-    loss_output_weights[ignore_outputs] = 0.
+    loss_output_weights[ignore_outputs] = 0.0
     logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
     model_params["loss_output_weights"] = loss_output_weights.tolist()
 
 
-def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
+def get_train_val_test_split(files, interleave=False, seperate_val_set=False):
     if not interleave:
         # use last 10% for test
         assert seperate_val_set
@@ -72,7 +77,7 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
             val_files = []
             for i, f in enumerate(files):
                 day_mod_30 = i % 30
-                if  day_mod_30 >= 27:
+                if day_mod_30 >= 27:
                     test_files.append(f)
                 # elif (day_mod_30 < 13) & (day_mod_30 >= 10):
                 #     val_files.append(f)
@@ -88,7 +93,7 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
             val_files = train_files[:N]
             train_files = train_files[N:]
 
-            logger.warning('overwriting with predefined split')
+            logger.warning("overwriting with predefined split")
 
             temp = json.load(open("/ssddg1/gaia/cache/files_split.json"))
             train_files = temp["train"]
@@ -105,29 +110,30 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set = False):
 
             return train_files, test_files, test_files
 
+
 def default_dataset_params(
     batch_size=24 * 96 * 144,
 ):
     base = "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4"
-    
+
     return dict(
         train=dict(
-            dataset_file=base+"_train.pt",
+            dataset_file=base + "_train.pt",
             batch_size=batch_size,
             shuffle=True,
-            flatten=False #already flattened
+            flatten=False,  # already flattened
         ),
         val=dict(
-            dataset_file=base+"_val.pt",
+            dataset_file=base + "_val.pt",
             batch_size=batch_size,
             shuffle=False,
-            flatten=False #already flattened
+            flatten=False,  # already flattened
         ),
         test=dict(
-            dataset_file=base+"_test.pt",
+            dataset_file=base + "_test.pt",
             batch_size=batch_size,
             shuffle=False,
-            flatten=True #already flattened
+            flatten=True,  # already flattened
         ),
     )
 
@@ -137,13 +143,13 @@ def default_dataset_params_v1(
     subsample_factor=12,
     flatten=True,
     interleave=True,
-    seperate_val_set = False,
+    seperate_val_set=False,
     inputs=["T", "Q", "RELHUM", "U", "V"],
     outputs=["PTEQ", "PTTEND", "PRECT"],
 ):
     files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
     train_files, val_files, test_files = get_train_val_test_split(
-        files, interleave=interleave,seperate_val_set=seperate_val_set
+        files, interleave=interleave, seperate_val_set=seperate_val_set
     )
 
     return dict(
@@ -199,7 +205,7 @@ def default_model_params(**kwargs):
 
 
 def default_trainer_params(**kwargs):
-    d =  dict(precision=16)
+    d = dict(precision=16)
     d.update(kwargs)
     return d
 
@@ -233,16 +239,17 @@ def main(
         # val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
         # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
 
-        
         update_model_params_from_dataset(train_dataset, model_params)
-
 
         model = TrainingModel(dataset_params=dataset_params, **model_params)
 
-        checkpoint_callback = ModelCheckpoint(monitor="val_mse",mode="min")
+        checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
-        trainer = pl.Trainer(max_epochs = 2000, callbacks=[checkpoint_callback],
-            log_every_n_steps=max(1, len(train_dataloader) // 100), **trainer_params
+        trainer = pl.Trainer(
+            max_epochs=2000,
+            callbacks=[checkpoint_callback],
+            log_every_n_steps=max(1, len(train_dataloader) // 100),
+            **trainer_params,
         )
 
         if "ckpt" in model_params:
@@ -251,17 +258,17 @@ def main(
         else:
             ckpt = None
 
-
-
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
 
     elif mode == "test":
         assert "ckpt" in model_params
 
-        model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
-        test_dataset, test_dataloader = get_dataset(
-            flatten_anyway=False, **dataset_params["train"]
+        model_dir = model_params["ckpt"]
+
+        model = TrainingModel.load_from_checkpoint(
+            get_checkpoint_file(model_dir)
         )
+        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
@@ -270,17 +277,20 @@ def main(
             **trainer_params,
         )
         test_results = trainer.test(model, dataloaders=test_dataloader)
-        run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(run_dir, "test_results_on_train.json")
+        # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+        path_to_save = os.path.join(model_dir, "test_results.json")
         json.dump(test_results, open(path_to_save, "w"))
 
     elif mode == "predict":
         assert "ckpt" in model_params
 
-        model = TrainingModel.load_from_checkpoint(model_params["ckpt"])
-        test_dataset, test_dataloader = get_dataset(
-            flatten_anyway=True, **dataset_params["test"]
+        model_dir = model_params["ckpt"]
+
+
+        model = TrainingModel.load_from_checkpoint(
+            get_checkpoint_file(model_dir)
         )
+        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
@@ -292,13 +302,10 @@ def main(
         # return yhat
         yhat = torch.cat(yhat)
 
-        if len(yhat.shape) == 2:
-            yhat = unflatten(yhat)
+        if len(yhat.shape) in [2, 3]:
+            yhat = unflatten_tensor(yhat)
 
-        
-
-        run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(run_dir, "predictions.pt")
+        # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+        path_to_save = os.path.join(model_dir, "predictions.pt")
 
         torch.save(yhat, path_to_save)
-

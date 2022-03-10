@@ -123,3 +123,7 @@ stats.pt
 *.pt
 *.html
 *.nc
+
+
+# keep
+!docs/*

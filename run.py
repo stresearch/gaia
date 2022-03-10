@@ -1,9 +1,9 @@
+
 import os
 
 # os.environ["CUDA_LAUNCH_BLOCKING"]="1"
 import glob
 import numpy as np
-import pytube
 
 
 # files_or_pattern = glob.glob("/proj/gaia-climate/data/cesm106_cam4/*.nc")[:1]
@@ -63,10 +63,11 @@ model_config={
 #               dataset_params = default_dataset_params(),
 #               model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))#, loss_output_weights = w))
 
-
-# main("predict", trainer_params = default_trainer_params(gpus=[3],precision=16),
+# for m in ["test","predict"]:
+#     for v in [0,1]:
+#         main(m, trainer_params = default_trainer_params(gpus=[7],precision=16),
 #               dataset_params = default_dataset_params(),
-#               model_params = dict(ckpt ="/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_1"))
+#               model_params = dict(ckpt =f"/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_{v}"))
 
 
 
@@ -121,5 +122,5 @@ model_config={
 
 # predict(gpus=[3])
 
-
-plot_results("lightning_logs/version_1")
+for v in [0]:
+    plot_results(f"lightning_logs/version_{v}")

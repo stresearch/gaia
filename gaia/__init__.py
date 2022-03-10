@@ -8,6 +8,11 @@ import sys
 
 APP_LOGGER_NAME = "gaia"
 
+CURRENT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+ASSET_DIR = os.path.join(CURRENT_DIRECTORY, "..","assets")
+
+LAND_FILE=os.path.join(ASSET_DIR,"ne_110m_land.geojson")
+
 file_name = None
 logger = logging.getLogger(APP_LOGGER_NAME)
 logger.setLevel(logging.DEBUG)

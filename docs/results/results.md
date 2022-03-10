@@ -1,4 +1,7 @@
 # Results
 ## SPCAM results
-### Baseline
-### With History
+
+[Baseline](spcam/plots_baseline.html)
+
+[With Memory](spcam/plots_memory.html)
+

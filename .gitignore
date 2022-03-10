@@ -126,4 +126,4 @@ stats.pt
 
 
 # keep
-!docs/*
+!docs/**

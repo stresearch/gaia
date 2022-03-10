@@ -5,3 +5,5 @@
 
 [With Memory](spcam/plots_memory.html)
 
+[Naive](spcam/plots_naive.html)
+

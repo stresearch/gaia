@@ -374,6 +374,16 @@ def plot_skill_scalar(y, yhat, lats, var_name=""):
 
 
 def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
+    
+    #make it so we can use land outlines
+    lons = np.array(lons)  
+    lons[lons>180] = lons[lons>180]-360
+    new_index = lons.argsort()
+    lons = lons[new_index]
+    
+    y = y[:,:,:,new_index]
+    yhat = yhat[:,:,:,new_index]
+
     reduce_dims = [0, 1]
     y_var = y.var(reduce_dims, unbiased=False)
     mse = (y - yhat).square().mean(reduce_dims)
@@ -381,8 +391,7 @@ def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
     # rmse = mse.sqrt()
     # std = y_var.sqrt()
 
-
-    lons = np.array(lons)  
+    
 
     width = height = 500
 
@@ -418,17 +427,20 @@ def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
     return skill_plot*outline + rmse_plot + std_plot
 
 def plot_results(model_dir):
+
     yaml_file = os.path.join(model_dir, "hparams.yaml")
     params = yaml.unsafe_load(open(yaml_file))
 
     test_data = torch.load(params["dataset_params"]["test"]["dataset_file"])["y"]
     if len(test_data.shape) == 5:
+        predictions = test_data[:,0,...]
         test_data = test_data[:, 1, ...]  # keep the second time step
 
     output_map = params["output_index"]
-    predictions = torch.load(os.path.join(model_dir, "predictions.pt"))
+    # predictions = torch.load(os.path.join(model_dir, "predictions.pt"))
 
     results = json.load(open(os.path.join(model_dir, "test_results.json")))
+    results = dict()
 
     plots = dict()
 
@@ -447,4 +459,4 @@ def plot_results(model_dir):
         + [("results", results)]
         + [("params", params)]
     )
-    combined_plot.save(os.path.join(model_dir, "plots.html"))
+    combined_plot.save(os.path.join(model_dir, "plots_naive.html"))

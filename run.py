@@ -121,6 +121,13 @@ model_config={
 
 
 # predict(gpus=[3])
+import shutil
 
 for v in [0]:
     plot_results(f"lightning_logs/version_{v}")
+    if v == 0:
+        shutil.copy(f"lightning_logs/version_{v}/plots_naive.html", "docs/results/spcam/plots_naive.html")
+    elif v == 1:
+        shutil.copy(f"lightning_logs/version_{v}/plots.html", "docs/results/spcam/plots_baseline.html")
+    # elif v == 2:
+    #     shutil.copy(f"lightning_logs/version_{v}/plot.html", "docs/results/spcam/plots_naive.html")

@@ -35,15 +35,22 @@
 
 ### Skill Plots
 
-Baseline model: 7 FCN layers  `f(x_t) -> y_t`
+- Baseline model: 7 FCN layers  `f(x_t) -> y_t`
+- Memory model: 7 FCN layers  `f(x_t,y_{t_1}) -> y_t`
+- Naive model: `y_{t-1} -> y_t`
 
-[Baseline](spcam/plots_baseline.html)
+#### Total (convective and large-scale) precipitation rate
+![precipitation rate](spcam/prec.png)
 
-Memory model: 7 FCN layers  `f(x_t,y_{t_1}) -> y_t`
+#### Q total physics tendency
+![q tend](spcam/qt.png)
 
-[With Memory](spcam/plots_memory.html)
+#### T total physics tendency
+![t tend](spcam/tt.png)
 
-Naive model: `y_{t-1} -> y_t`
+#### Interactive Plots
 
-[Naive](spcam/plots_naive.html)
+[Baseline](spcam/plots_baseline.html), 
+[With Memory](spcam/plots_memory.html), 
+[Only Memory](spcam/plots_naive.html)
 

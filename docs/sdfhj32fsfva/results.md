@@ -1,6 +1,12 @@
 # Results
 ## SPCAM results
 
+### Dataset
+
+- dataset - 3 years, 16 time steps per day (0:00,0:20min, 3:00,3:200min, ... )
+- train: 2 years, subsampled by 4, so 365x2x2x144x96 vertical columns (randomly sampled over time,lat,lon)
+- test: 1 year, subsampled by 4, so 365x1x2x144x96 vertical columns (test sammpled 2 per day for every lat,lon grid cell)
+
 ### Inputs
 
 `x_t`

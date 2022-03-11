@@ -3,6 +3,8 @@
 
 ### Inputs
 
+`x_t`
+
 | Name | Long Name | shape | unit |
 | --- | --- | --- | --- |
 | Q | Specific humidity | (16, 30, 96, 144) | kg/kg|
@@ -22,6 +24,8 @@
 
 ### Outputs
 
+`y_t`
+
 | Name | Long Name | shape | unit |
 | --- | --- | --- | --- |
 | PRECT | Total (convective and large-scale) precipitation rate (liq + ice) | (16, 96, 144) | m/s|
@@ -31,9 +35,15 @@
 
 ### Skill Plots
 
+Baseline model: 7 FCN layers  `f(x_t) -> y_t`
+
 [Baseline](spcam/plots_baseline.html)
 
+Memory model: 7 FCN layers  `f(x_t,y_{t_1}) -> y_t`
+
 [With Memory](spcam/plots_memory.html)
+
+Naive model: `y_{t-1} -> y_t`
 
 [Naive](spcam/plots_naive.html)
 

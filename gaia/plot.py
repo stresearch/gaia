@@ -433,14 +433,14 @@ def plot_results(model_dir):
 
     test_data = torch.load(params["dataset_params"]["test"]["dataset_file"])["y"]
     if len(test_data.shape) == 5:
-        predictions = test_data[:,0,...]
+        # predictions = test_data[:,0,...]
         test_data = test_data[:, 1, ...]  # keep the second time step
 
     output_map = params["output_index"]
-    # predictions = torch.load(os.path.join(model_dir, "predictions.pt"))
+    predictions = torch.load(os.path.join(model_dir, "predictions.pt"))
 
     results = json.load(open(os.path.join(model_dir, "test_results.json")))
-    results = dict()
+    # results = dict()
 
     plots = dict()
 

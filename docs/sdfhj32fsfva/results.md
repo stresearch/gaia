@@ -37,7 +37,7 @@
 
 - Baseline model: 7 FCN layers  `f(x_t) -> y_t`
 - Memory model: 7 FCN layers  `f(x_t,y_{t_1}) -> y_t`
-- Naive model: `y_{t-1} -> y_t`
+- Only Memory model: `y_{t-1} -> y_t`
 
 #### Total (convective and large-scale) precipitation rate
 ![precipitation rate](spcam/prec.png)

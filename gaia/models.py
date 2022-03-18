@@ -23,6 +23,7 @@ class TrainingModel(LightningModule):
         use_output_scaling=False,
         replace_std_with_range=False,
         loss_output_weights=None,
+        memory_variables = None,
         **kwargs,
     ):
         super().__init__()
@@ -34,6 +35,15 @@ class TrainingModel(LightningModule):
 
         self.save_hyperparameters(ignore=ignore)
         model_type = model_config["model_type"]
+
+        if memory_variables is not None:
+            logger.info(f"using a subset of output vars in memory: {memory_variables}")
+            memory_variable_index = []
+            for v in memory_variables:
+                memory_variable_index.append(torch.arange(*output_index[v]))
+            self.register_buffer("memory_variable_index",torch.cat(memory_variable_index))
+            model_config["memory_size"] = len(self.memory_variable_index)
+
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
         elif model_type == "conv":
@@ -157,6 +167,9 @@ class TrainingModel(LightningModule):
 
             if self.hparams.model_config["model_type"] == "fcn_history":
                 y1 = self.output_normalize(y1)
+                if self.hparams.memory_variables is not None:
+                    # not using all variables for history
+                    y1 = y1[:,self.memory_variable_index,...]
                 return [x,y1],y2
             else:
                 # dont use history
@@ -342,6 +355,7 @@ class FcnHistory(torch.nn.Module):
         leaky_relu: float = 0.15,
         time_steps: int = 1,
         model_type=None,
+        memory_size = None
     ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -351,8 +365,11 @@ class FcnHistory(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.time_steps = time_steps
+        if memory_size is None:
+            memory_size = output_size
+        self.memory_size = memory_size
         self.main_layers = self.make_layers()
-        self.output_history_layer = torch.nn.Linear(self.output_size, self.hidden_size)
+        self.output_history_layer = torch.nn.Linear(self.memory_size, self.hidden_size)
         self.non_linear_ops = torch.nn.Sequential(
                 torch.nn.BatchNorm1d(self.hidden_size),
                 torch.nn.Dropout(self.dropout),

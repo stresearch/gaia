@@ -4,7 +4,10 @@ import os
 # os.environ["CUDA_LAUNCH_BLOCKING"]="1"
 import glob
 import numpy as np
+from gaia.evaluate import process_results
+from gaia import get_logger
 
+logger = get_logger(__name__)
 
 # files_or_pattern = glob.glob("/proj/gaia-climate/data/cesm106_cam4/*.nc")[:1]
 
@@ -26,108 +29,47 @@ from gaia.training import (
 from gaia.plot import plot_results
 
 
-# compute_stats()
-# run(flatten = False, gpus=[3], lr = 1e-3, num_layers=3)
-# construct_data()
-# run(flatten = False, gpus=[1])
 
-
-# base_lr = 1e-4
-# base_batch_size = 1024
-# batch_size = 32768
-# lr = float(base_lr*np.sqrt(2)**(batch_size/base_batch_size-1))
-
-# run(gpus=[4], lr = 1e-3, num_layers=7, batch_size=24*96*144,optimizer="lamb")
-
-# ckpt = "lightning_logs/version_3/checkpoints/epoch=999-step=78999.ckpt"
-
-# w = np.zeros(53)
-# w[:5] = 1.
-# w = w.tolist()
-
-# model_config={
-#             "model_type": "fcn",
-#             "num_layers": 1,
-#         }
-
-# main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
-#               dataset_params = default_dataset_params(subsample_factor=8, batch_size = 24*96*144, seperate_val_set=False, flatten=True),
-#               model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, loss_output_weights = w))
 
 model_config={
-            "model_type": "fcn",
-            "num_layers": 7,
-        }
+              "model_type": "fcn_history",
+              "num_layers": 7,
+             }
 
-# main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
+
+
+# main("train", trainer_params = default_trainer_params(gpus=[6],precision=16),
 #               dataset_params = default_dataset_params(),
-#               model_params =   default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))#, loss_output_weights = w))
-
-# for m in ["test","predict"]:
-#     for v in [0,1]:
-#         main(m, trainer_params = default_trainer_params(gpus=[7],precision=16),
-#               dataset_params = default_dataset_params(),
-#               model_params = dict(ckpt =f"/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_{v}"))
+#               model_params =   default_model_params(memory_variables = ["PTEQ"],lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))
 
 
 
-
-# ckpt = "lightning_logs/version_0/checkpoints/epoch=999-step=629999.ckpt"
-# ckpt = "lightning_logs_old/version_12/checkpoints/epoch=854-step=478799.ckpt"
-# ckpt = "lightning_logs_old/version_2/checkpoints/epoch=224-step=141299.ckpt"
-
-# model_config = {
-#     "input_size": 130,
-#     "model_type": "conv",
-#     "output_size": 79,
-#     "num_layers": 7,
-# }
-
-# main(
-#     "test",
-#     trainer_params=default_trainer_params(gpus=[7],precision=16),
-#     dataset_params=default_dataset_params(
-#         # batch_size=24,
-#         subsample_factor=8, batch_size = 24*96*144,
-#         interleave=True,
-#         # outputs=["PTEQ", "PTTEND", "PRECT", "TTEND_TOT"],
-#     ),
-#     model_params=default_model_params(
-#         ckpt=ckpt,
-#         # model_config=model_config,data_stats = None,
-#     ),
-# )
+# for i in [0,1,2,3,4]:
+#     model_dir = f"/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_{i}"
 
 
-# model_params
+#     if not os.path.exists(os.path.join(model_dir, "predictions.pt")):
+#         logger.info(f"predicting {model_dir}")
+#         main("predict", trainer_params = default_trainer_params(gpus=[1],precision=16),
+#                     dataset_params = default_dataset_params(),
+#                     model_params =   default_model_params(ckpt =model_dir))
 
-# main(
-#     "predict",
-#     trainer_params=default_trainer_params(gpus=[1]),
-#     dataset_params=default_dataset_params(
-#         subsample_factor=1, batch_size=24*96*144, flatten=False
-#     ),
-#     model_params=dict(
-#         # model_config={
-#         #     "input_size": 130,
-#         #     "model_type": "conv",
-#         #     "output_size": 79,
-#         #     "num_layers": 7,
-#         # },
-#         # ckpt="lightning_logs/version_2/checkpoints/epoch=224-step=141299.ckpt",
-#         ckpt="lightning_logs/version_12/checkpoints/epoch=582-step=326479.ckpt",
-#     ),
-# )
+#     if not os.path.exists(os.path.join(model_dir, "results.pt")):
+#         logger.info(f"processing results {model_dir}")
+#         process_results(model_dir)
 
+process_results("/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_0", naive_memory = True)
 
 # predict(gpus=[3])
-import shutil
+# import shutil
 
-for v in [0]:
-    plot_results(f"lightning_logs/version_{v}")
-    if v == 0:
-        shutil.copy(f"lightning_logs/version_{v}/plots_naive.html", "docs/results/spcam/plots_naive.html")
-    elif v == 1:
-        shutil.copy(f"lightning_logs/version_{v}/plots.html", "docs/results/spcam/plots_baseline.html")
-    # elif v == 2:
-    #     shutil.copy(f"lightning_logs/version_{v}/plot.html", "docs/results/spcam/plots_naive.html")
+
+
+# for v in [0]:
+#     plot_results(f"lightning_logs/version_{v}")
+#     if v == 0:
+#         shutil.copy(f"lightning_logs/version_{v}/plots_naive.html", "docs/results/spcam/plots_naive.html")
+#     elif v == 1:
+#         shutil.copy(f"lightning_logs/version_{v}/plots.html", "docs/results/spcam/plots_baseline.html")
+#     # elif v == 2:
+#     #     shutil.copy(f"lightning_logs/version_{v}/plot.html", "docs/results/spcam/plots_naive.html")

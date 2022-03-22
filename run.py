@@ -34,13 +34,14 @@ from gaia.plot import plot_results
 model_config={
               "model_type": "fcn_history",
               "num_layers": 7,
+            #   "num_output_layers": 6
              }
 
 
 
-# main("train", trainer_params = default_trainer_params(gpus=[6],precision=16),
-#               dataset_params = default_dataset_params(),
-#               model_params =   default_model_params(memory_variables = ["PTEQ"],lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))
+main("train", trainer_params = default_trainer_params(gpus=[5],precision=16),
+              dataset_params = default_dataset_params(),
+              model_params = default_model_params(lr = 1e-4, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))
 
 
 
@@ -58,7 +59,7 @@ model_config={
 #         logger.info(f"processing results {model_dir}")
 #         process_results(model_dir)
 
-process_results("/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_0", naive_memory = True)
+# process_results("/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_0")#, naive_memory = True)
 
 # predict(gpus=[3])
 # import shutil

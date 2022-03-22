@@ -246,51 +246,6 @@ class TrainingModel(LightningModule):
     def test_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "test")
 
-    def _test_step(self, batch, batch_idx, dataloader_idx=None):
-        x, y_unnorm = batch
-        x = self.input_normalize(x)
-        y = self.output_normalize(y_unnorm)
-        yhat = self(x)
-        loss = OrderedDict()
-        loss["mse"] = 0.0
-
-        mode = "test"
-
-        for k, v in self.hparams.output_index.items():
-            loss_name = f"mse_{k}"
-            loss[loss_name] = F.mse_loss(
-                yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
-            )
-            w = 1.0
-            loss["mse"] += w * loss[loss_name]
-            self.log(
-                f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
-            )
-
-        self.log(f"{mode}_mse", loss[f"mse"], on_epoch=True)
-
-        ##unnorm
-
-        loss["mse_u"] = 0.0
-
-        mode = "test"
-
-        yhat = self.output_normalize(yhat, normalize=False)
-        y = y_unnorm
-
-        for k, v in self.hparams.output_index.items():
-            loss_name = f"mse_u_{k}"
-            loss[loss_name] = F.mse_loss(
-                yhat[:, v[0] : v[1], ...], y[:, v[0] : v[1], ...]
-            )
-            w = 1.0
-            loss["mse_u"] += w * loss[loss_name]
-            self.log(
-                f"{mode}_{loss_name}", loss[loss_name], on_epoch=True, on_step=False
-            )
-
-        self.log(f"{mode}_mse_u", loss[f"mse_u"], on_epoch=True)
-
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         x, y = self.handle_batch(batch)
         yhat = self(x)
@@ -354,6 +309,7 @@ class FcnHistory(torch.nn.Module):
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
         time_steps: int = 1,
+        num_output_layers: int = 1,
         model_type=None,
         memory_size = None
     ):
@@ -368,20 +324,22 @@ class FcnHistory(torch.nn.Module):
         if memory_size is None:
             memory_size = output_size
         self.memory_size = memory_size
-        self.main_layers = self.make_layers()
+        self.num_output_layers = num_output_layers
+        self.main_layers = self.make_input_layers()
         self.output_history_layer = torch.nn.Linear(self.memory_size, self.hidden_size)
+
         self.non_linear_ops = torch.nn.Sequential(
                 torch.nn.BatchNorm1d(self.hidden_size),
                 torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
             )
-        self.output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
+        self.output_layer = self.make_output_layers()
 
 
-
-    def make_layers(self):
-        if self.num_layers == 1:
-            return torch.nn.Linear(self.input_size, self.output_size)
+    def make_output_layers(self):
+        output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+        if self.num_output_layers == 1:
+            return output_layer
 
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
@@ -392,19 +350,47 @@ class FcnHistory(torch.nn.Module):
             )
             return layer
 
-        input_layer = make_layer(self.input_size, self.hidden_size)
         intermediate_layers = [
             make_layer(self.hidden_size, self.hidden_size)
-            for _ in range(self.num_layers - 3)
+            for _ in range(self.num_output_layers - 1)
         ]
+        layers = intermediate_layers + [output_layer]
+        return torch.nn.Sequential(*layers)
+
+    def make_input_layers(self):
+
+        num_layers = self.num_layers - self.num_output_layers
+
+        def make_layer(ins, outs):
+            layer = torch.nn.Sequential(
+                torch.nn.Linear(ins, outs),
+                torch.nn.BatchNorm1d(outs),
+                torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+            return layer
+
+        if num_layers == 1:
+            return torch.nn.Linear(self.input_size, self.hidden_size)
+
+        input_layer = make_layer(self.input_size, self.hidden_size)
         output_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
+
+        intermediate_layers = [
+            make_layer(self.hidden_size, self.hidden_size)
+            for _ in range(num_layers - 2)
+        ]
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
-    def forward(self, inputs):
-        x, yh = inputs
+    def forward(self, inputs, memory = None):
+        if memory is None:
+            x, yh = inputs
+        else:
+            x = inputs
+            yh = memory
         h1 =  self.main_layers(x)
-        h2 = self.output_history_layer(yh)
+        h2 =  self.output_history_layer(yh)
         h = self.non_linear_ops(h1 + h2)
         y = self.output_layer(h)
         return y

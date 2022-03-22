@@ -788,10 +788,10 @@ class NCDataConstructor:
         if save_file is not None:
             torch.save(out, save_file)
 
-        # logger.info("erasing temp files")
-        # for f in tqdm.tqdm(sorted(cache_files)):
-        #     if os.path.exists(f):
-        #         os.remove(f)
+        logger.info("erasing temp files")
+        for f in tqdm.tqdm(sorted(cache_files)):
+            if os.path.exists(f):
+                os.remove(f)
                 
         return out
 

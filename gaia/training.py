@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import json
 import os
+from gaia.callbacks import WriteGraph
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
     NcDatasetMem,
@@ -244,6 +245,8 @@ def main(
         model = TrainingModel(dataset_params=dataset_params, **model_params)
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
+
+        # write_graph = WriteGraph()
 
         trainer = pl.Trainer(
             max_epochs=2000,

@@ -26,6 +26,7 @@ class TrainingModel(LightningModule):
         replace_std_with_range=False,
         loss_output_weights=None,
         memory_variables = None,
+        ignore_input_variables = None,
         **kwargs,
     ):
         super().__init__()
@@ -45,6 +46,16 @@ class TrainingModel(LightningModule):
                 memory_variable_index.append(torch.arange(*output_index[v]))
             self.register_buffer("memory_variable_index",torch.cat(memory_variable_index))
             model_config["memory_size"] = len(self.memory_variable_index)
+
+        if ignore_input_variables is not None:
+            logger.info(f"using a subset of inputs vars: {memory_variables}")
+            input_variable_index = []
+            for k,v in input_index.items():
+                if k not in ignore_input_variables:
+                    start_idx,stop_idx = v
+                    input_variable_index.append(torch.arange(start_idx,stop_idx))
+                    self.register_buffer("input_variable_index",torch.cat(input_variable_index))
+                    model_config["input_size"] = len(self.input_variable_index)
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
@@ -156,6 +167,12 @@ class TrainingModel(LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def select_input_variables(self,x):
+        if self.hparams.ignore_input_variables is None:
+            return x
+        else:
+            return x[:,self.input_variable_index,...]
+
     def handle_batch(self, batch):
         x,y = batch
         num_dims = len(x.shape)
@@ -164,6 +181,7 @@ class TrainingModel(LightningModule):
 
             # have history
             x = x[:,-1,...] #only use last time stemps for state vars
+            x = self.select_input_variables(x)
             y1 = y[:,0,...]
             y2 = y[:,1,...]
             x = self.input_normalize(x)
@@ -182,6 +200,8 @@ class TrainingModel(LightningModule):
         else:
             x = self.input_normalize(x)
             y = self.output_normalize(y)
+            x = self.select_input_variables(x)
+
             return x,y
 
 

@@ -40,8 +40,8 @@ model_config={
 # base = "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4"
 base = "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4"
 
-main("train", trainer_params = default_trainer_params(gpus=[0],precision=16),
-              dataset_params = default_dataset_params(base=base),
+main("train", trainer_params = default_trainer_params(gpus=[3],precision=16),
+              dataset_params = default_dataset_params(base=base, batch_size = 10 * 96 * 144),
               model_params = default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))
 
 

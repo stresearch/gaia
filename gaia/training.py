@@ -54,7 +54,7 @@ def update_model_params_from_dataset(dataset_dict, model_params):
         )
     )
 
-    mean_thres = 1e-15
+    mean_thres = 1e-13
     ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
     loss_output_weights = torch.ones(ignore_outputs.shape[0])
     loss_output_weights[ignore_outputs] = 0.0

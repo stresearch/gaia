@@ -2,6 +2,7 @@ from collections import OrderedDict
 import json
 import os
 from gaia.callbacks import WriteGraph
+from gaia.evaluate import process_results
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
     NcDatasetMem,
@@ -114,8 +115,10 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set=False):
 
 def default_dataset_params(
     batch_size=24 * 96 * 144,
-):
     base = "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4"
+):
+    
+    var_index_file = base + "_var_index.pt"
 
     return dict(
         train=dict(
@@ -123,18 +126,21 @@ def default_dataset_params(
             batch_size=batch_size,
             shuffle=True,
             flatten=False,  # already flattened
+            var_index_file = var_index_file
         ),
         val=dict(
             dataset_file=base + "_val.pt",
             batch_size=batch_size,
             shuffle=False,
             flatten=False,  # already flattened
+            var_index_file = var_index_file
         ),
         test=dict(
             dataset_file=base + "_test.pt",
             batch_size=batch_size,
             shuffle=False,
             flatten=True,  # already flattened
+            var_index_file = var_index_file
         ),
     )
 
@@ -312,3 +318,7 @@ def main(
         path_to_save = os.path.join(model_dir, "predictions.pt")
 
         torch.save(yhat, path_to_save)
+
+
+        logger.info("processing results")
+        process_results(model_dir)

@@ -391,6 +391,24 @@ def unflatten_tensor(v):
     return v
 
 
+def get_variable_index(dataset, variable_names, channel_dim = 1):
+    out = OrderedDict()
+    i = 0
+    
+    for n in variable_names:
+        shape = dataset[n].shape
+        if len(shape) < 4:
+            num_channels = 1
+        elif len(shape) == 4:
+            num_channels = shape[channel_dim]
+        else:
+            raise ValueError("all variables must have at least 3 dims")
+        j = i + num_channels
+        out[n] = [i, j]
+        i = j
+
+    return out
+
 class NCDataConstructor:
     def __init__(
         self,
@@ -897,12 +915,15 @@ def get_dataset(
     dataset_file,
     batch_size=1024,
     flatten=False,
-    shuffle = False
+    shuffle = False,
+    var_index_file = None
 ):
 
     dataset_dict = torch.load(dataset_file)
 
-    var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
+    # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
+    var_index = torch.load(var_index_file)
+
     dataset_dict.update(var_index)
 
     del dataset_dict["index"]

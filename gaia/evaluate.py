@@ -24,7 +24,7 @@ def get_skill_ave(y,yhat,reduce_dims = [0, 3]):
 
 
 
-def process_results(model_dir, lons = lons, lats  =lats, levels = levels, naive_memory = False):
+def process_results(model_dir, lons = lons, lats  = lats, levels = levels, naive_memory = False):
     yaml_file = os.path.join(model_dir, "hparams.yaml")
     params = yaml.unsafe_load(open(yaml_file))
 

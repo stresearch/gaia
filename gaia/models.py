@@ -39,6 +39,9 @@ class TrainingModel(LightningModule):
         self.save_hyperparameters(ignore=ignore)
         model_type = model_config["model_type"]
 
+        self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
+
+
         if memory_variables is not None:
             logger.info(f"using a subset of output vars in memory: {memory_variables}")
             memory_variable_index = []
@@ -48,14 +51,14 @@ class TrainingModel(LightningModule):
             model_config["memory_size"] = len(self.memory_variable_index)
 
         if ignore_input_variables is not None:
-            logger.info(f"using a subset of inputs vars: {memory_variables}")
+            logger.info(f"using a subset of inputs vars: {ignore_input_variables}")
             input_variable_index = []
             for k,v in input_index.items():
                 if k not in ignore_input_variables:
                     start_idx,stop_idx = v
                     input_variable_index.append(torch.arange(start_idx,stop_idx))
-                    self.register_buffer("input_variable_index",torch.cat(input_variable_index))
-                    model_config["input_size"] = len(self.input_variable_index)
+            self.register_buffer("input_variable_index",torch.cat(input_variable_index))
+            model_config["input_size"] = len(self.input_variable_index)
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
@@ -63,12 +66,11 @@ class TrainingModel(LightningModule):
             self.model = ConvNet1x1(**model_config)
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
-        elif model_type == "unet":
-            self.model = UNet1D(input_index=input_index, output_index=output_index, **model_config)
+        elif model_type == "conv1d":
+            self.model = ConvNet1D(input_index=input_index, output_index=output_index, **model_config)
         else:
             raise ValueError("unknown model_type")
 
-        self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
 
         if loss_output_weights is not None:
             logger.info(f"using output weights {loss_output_weights}")
@@ -95,11 +97,18 @@ class TrainingModel(LightningModule):
                 "no stats provided, assuming will be loaded later, initializing randomly"
             )
             layers = []
-            for v in ["input_size", "output_size"]:
+
+            #can't rely on model_config since some variables can be dropped,
+            #so lets recompute size from index since that never changes
+            #last value is the last element
+            sizes = [list(self.hparams.input_index.values())[-1][-1],
+                     list(self.hparams.output_index.values())[-1][-1]]
+
+            for v in sizes:
                 layers.append(
                     Normalization(
-                        torch.rand(self.hparams.model_config[v]),
-                        torch.rand(self.hparams.model_config[v]),
+                        torch.rand(v),
+                        torch.rand(v),
                     )
                 )
             return layers
@@ -181,10 +190,11 @@ class TrainingModel(LightningModule):
 
             # have history
             x = x[:,-1,...] #only use last time stemps for state vars
-            x = self.select_input_variables(x)
             y1 = y[:,0,...]
             y2 = y[:,1,...]
             x = self.input_normalize(x)
+            x = self.select_input_variables(x)
+
             y2 = self.output_normalize(y2)
 
             if self.hparams.model_config["model_type"] == "fcn_history":
@@ -420,51 +430,89 @@ class FcnHistory(torch.nn.Module):
         return y
 
 
-class UNet1D(torch.nn.Module):
-    def __init__(self,
-        input_size: int = 26 * 2,
+
+class ConvNet1D(torch.nn.Module):
+    def __init__(
+        self,
         num_layers: int = 7,
         hidden_size: int = 512,
-        output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
-        time_steps: int = 1,
-        num_output_layers: int = 1,
-        model_type=None,
+        kernel_size: int = 3,
         input_index = None,
         output_index = None,
-        memory_size = None):
-
-
+        model_type=None,
+        dilation = True,
+        **other,
+    ):
         super().__init__()
-        # self.hidden_size = hidden_size
+        self.hidden_size = hidden_size
         # self.input_size = input_size
-        # self.output_size = output_size
-        # self.dropout = dropout
-        # self.leaky_relu = leaky_relu
-        # self.num_layers = num_layers
-        # self.time_steps = time_steps
-        # if memory_size is None:
-        #     memory_size = output_size
-        # self.memory_size = memory_size
-        # self.num_output_layers = num_output_layers
+        # self.output_size = output_size= ou
         self.input_index = input_index
-        self.output_index = output_index
-
+        self.output_index  = output_index
+        self.kernel_size = kernel_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
         self.set_up_dims()
+        self.model = self.make_model()
+        # if len(other) > 0:
+        #     logger.warn(f"unused kwargs {other}")
 
-        self.unet = UNet(dimensions = 1, 
-                         num_encoding_blocks = 2,   
-                         normalization="batch",
-                         in_channels = self.num_input_channels,
-                         out_classes= self.num_output_channels,
-                         dropout=dropout)
+    def make_model(self):
+        if self.num_layers == 1:
+            raise ValueError
+
+        def make_layer(ins, outs, dilation = 1):
+            layer = torch.nn.Sequential(
+                torch.nn.Conv1d(ins, outs, kernel_size=self.kernel_size, bias=False, padding='same', dilation = dilation),
+                torch.nn.BatchNorm1d(outs),
+                torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+            return layer
+
+        
+        input_layer = make_layer(self.input_size, self.hidden_size)
+
+    
+        intermediate_layers = [
+            make_layer(self.hidden_size, self.hidden_size)
+            for _ in range(self.num_layers - 2)
+        ]
+        output_layer = torch.nn.Conv1d(self.hidden_size, self.output_size, kernel_size=self.kernel_size, bias=True, padding='same')
+        layers = [input_layer] + intermediate_layers + [output_layer]
+        return torch.nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.arange_spatially(x,"input")
+        y = self.model(x)
+        y = self.flatten(y, "output")
+        return y
 
     def set_up_dims(self):
         self.num_levels = max([e-s for s,e in self.input_index.values()])
-        self.num_input_channels = len(self.input_index)
-        self.num_output_channels = len(self.output_index)
+        self.input_size = len(self.input_index)
+        self.output_size = len(self.output_index)
 
+
+    def flatten(self,x,kind):
+
+        if kind == "input":
+            index_dict = self.input_index
+        elif kind == "output":
+            index_dict = self.output_index
+
+        xout = []
+        for i,(k,v) in enumerate(index_dict.items()):
+            s,e = v
+            if e-s == 1: #scalar expand
+                xout.append(x[:,i,:].mean(-1,keepdim=True))
+            else: #per level
+                xout.append(x[:,i,:])
+
+        return torch.cat(xout,dim=1)
 
     def arange_spatially(self,x,kind):
         
@@ -483,33 +531,7 @@ class UNet1D(torch.nn.Module):
 
         xout =  torch.cat(xout,dim=1)
 
-        return F.pad(xout,[1,1])
-
-   
-
-    def flatten(self,x,kind):
-
-        if kind == "input":
-            index_dict = self.input_index
-        elif kind == "output":
-            index_dict = self.output_index
-
-        xout = []
-        for i,(k,v) in enumerate(index_dict.items()):
-            s,e = v
-            if e-s == 1: #scalar expand
-                xout.append(x[:,i,1:-1].mean(-1,keepdim=True))
-            else: #per level
-                xout.append(x[:,i,1:-1])
-
-        return torch.cat(xout,dim=1)
-
-    def forward(self, x):
-        x = self.arange_spatially(x,"input")
-        y = self.unet(x)
-        y = self.flatten(y, "output")
-        return y
-
+        return xout
 
 
 class ConvNet1x1(torch.nn.Module):

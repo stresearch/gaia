@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
-
+from gaia.plot import levels26
 
 from gaia import get_logger
 
@@ -239,7 +239,11 @@ def main(
     logger.info(f"dataset_params: \n{make_pretty_for_log(dataset_params)}")
     logger.info(f"model_params: \n{make_pretty_for_log(model_params)}")
 
-    if mode == "train":
+    mode = mode.split(",")
+
+    model_dir = None
+
+    if "train" in mode:
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
         val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
 
@@ -255,13 +259,13 @@ def main(
         # write_graph = WriteGraph()
 
         trainer = pl.Trainer(
-            max_epochs=2000,
+            max_epochs=200,
             callbacks=[checkpoint_callback],
             log_every_n_steps=max(1, len(train_dataloader) // 100),
             **trainer_params,
         )
 
-        if "ckpt" in model_params:
+        if model_params.get("ckpt",None) is not None:
             logger.info(f"loading existing ckpt {model_params}")
             ckpt = model_params["ckpt"]
         else:
@@ -269,10 +273,18 @@ def main(
 
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
 
-    elif mode == "test":
-        assert "ckpt" in model_params
+        model_dir = trainer.log_dir
 
-        model_dir = model_params["ckpt"]
+        del train_dataset
+        del train_dataloader
+        del val_dataset
+        del val_dataloader
+
+    if "test" in mode:
+
+        if model_dir is None:
+            assert "ckpt" in model_params
+            model_dir = model_params["ckpt"]
 
         model = TrainingModel.load_from_checkpoint(
             get_checkpoint_file(model_dir)
@@ -290,10 +302,13 @@ def main(
         path_to_save = os.path.join(model_dir, "test_results.json")
         json.dump(test_results, open(path_to_save, "w"))
 
-    elif mode == "predict":
-        assert "ckpt" in model_params
 
-        model_dir = model_params["ckpt"]
+    if "predict" in mode:
+
+
+        if model_dir is None:
+            assert "ckpt" in model_params
+            model_dir = model_params["ckpt"]
 
 
         model = TrainingModel.load_from_checkpoint(
@@ -307,6 +322,7 @@ def main(
             logger=False,
             **trainer_params,
         )
+        
         yhat = trainer.predict(model, dataloaders=test_dataloader)
         # return yhat
         yhat = torch.cat(yhat)
@@ -319,6 +335,15 @@ def main(
 
         torch.save(yhat, path_to_save)
 
+        del test_dataset
+        del test_dataloader
+        del yhat
+
+    if "results" in mode:
+
+        if model_dir is None:
+            assert "ckpt" in model_params
+            model_dir = model_params["ckpt"]
 
         logger.info("processing results")
-        process_results(model_dir)
+        process_results(model_dir, levels = levels26)

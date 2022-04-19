@@ -1,6 +1,8 @@
 from collections import OrderedDict
 import json
 import os
+
+from sympy import interpolate
 from gaia.callbacks import WriteGraph
 from gaia.evaluate import process_results
 from gaia.models import ComputeStats, TrainingModel
@@ -17,7 +19,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
-from gaia.plot import levels26
+from gaia.plot import levels26, levels
 
 from gaia import get_logger
 
@@ -37,7 +39,7 @@ def get_checkpoint_file(file):
             raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
-def update_model_params_from_dataset(dataset_dict, model_params):
+def update_model_params_from_dataset(dataset_dict, model_params, mean_thres = 1e-13):
 
     model_params["model_config"].update(
         {
@@ -54,16 +56,17 @@ def update_model_params_from_dataset(dataset_dict, model_params):
         )
     )
 
-    mean_thres = 1e-13
-    ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
-    loss_output_weights = torch.ones(ignore_outputs.shape[0])
-    loss_output_weights[ignore_outputs] = 0.0
-    logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
+    if mean_thres > 0:
+        ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
+        loss_output_weights = torch.ones(ignore_outputs.shape[0])
+        loss_output_weights[ignore_outputs] = 0.0
+        logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
-    model_params["loss_output_weights"] = loss_output_weights.tolist()
+        model_params["loss_output_weights"] = loss_output_weights.tolist()
 
 
 def get_train_val_test_split(files, interleave=False, seperate_val_set=False):
+    raise DeprecationWarning
     if not interleave:
         # use last 10% for test
         assert seperate_val_set
@@ -272,13 +275,17 @@ def main(
             ckpt = None
 
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
-
         model_dir = trainer.log_dir
 
-        del train_dataset
-        del train_dataloader
-        del val_dataset
-        del val_dataloader
+        #compute validation on best model
+        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
+        validation_score = trainer.validate(model, val_dataloader)
+        json.dump(validation_score, open(os.path.join(model_dir, "validation_score.json"),"w"))
+
+        # del train_dataset
+        # del train_dataloader
+        # del val_dataset
+        # del val_dataloader
 
     if "test" in mode:
 
@@ -311,10 +318,20 @@ def main(
             model_dir = model_params["ckpt"]
 
 
-        model = TrainingModel.load_from_checkpoint(
-            get_checkpoint_file(model_dir)
-        )
         test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
+
+        ### loading a different dataset
+        interpolation_params = None
+        # interpolation_params = dict()
+        # interpolation_params["input_index"] = test_dataset["input_index"]
+        # interpolation_params["output_index"] = test_dataset["output_index"]
+        # interpolation_params["input_grid"] = levels26
+        # interpolation_params["output_grid"] = levels
+
+
+        model = TrainingModel.load_from_checkpoint(
+            get_checkpoint_file(model_dir), strict=False, **{"interpolate":interpolation_params}
+        )
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),

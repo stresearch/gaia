@@ -69,13 +69,18 @@ def run():
     parser.add_argument("--input_var_ignore", default=None, type=str)
     parser.add_argument(
         "--dataset",
-        default="/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
+        default= "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
         type=str,
     )
-    parser.add_argument("--gpu", default=6, type=int)
+    parser.add_argument("--gpu", default=1, type=int)
     parser.add_argument("--model_type", default="baseline", type=str)
     parser.add_argument("--mode", default="train",type=str)
     parser.add_argument("--ckpt",default=None,type=str)
+    parser.add_argument("--hidden_size", default=512, type = int)
+    parser.add_argument("--lr", default=.001, type = float)
+    parser.add_argument("--num_layers", default=7, type = int)
+    parser.add_argument("--batch_size", default=10 * 96 * 144, type = int)
+    parser.add_argument("--dropout", default=.01, type = float)
 
     args = parser.parse_args()
 
@@ -83,7 +88,9 @@ def run():
 
         model_config = {
             "model_type": "fcn",
-            "num_layers": 7,
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout" : args.dropout
             #   "num_output_layers": 6
         }
     elif args.model_type == "memory":
@@ -106,11 +113,11 @@ def run():
         args.mode,
         trainer_params=default_trainer_params(gpus=[args.gpu], precision=16),
         dataset_params=default_dataset_params(
-            base=args.dataset, batch_size=10 * 96 * 144
+            base=args.dataset, batch_size=args.batch_size
         ),
         model_params=default_model_params(
-            ignore_input_variables=[args.input_var_ignore],
-            lr=1e-4,
+            ignore_input_variables=None,#[args.input_var_ignore],
+            lr=args.lr,
             use_output_scaling=False,
             replace_std_with_range=False,
             model_config=model_config,

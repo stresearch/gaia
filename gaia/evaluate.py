@@ -5,7 +5,7 @@ import yaml
 import os
 import torch
 from gaia import get_logger
-from gaia.plot import levels, lats, lons
+from gaia.plot import levels as LEVELS, levels26 as LEVELS26, lats, lons
 
 import numpy as np
 import pandas as pd
@@ -24,9 +24,18 @@ def get_skill_ave(y,yhat,reduce_dims = [0, 3]):
 
 
 
-def process_results(model_dir, lons = lons, lats  = lats, levels = levels, naive_memory = False):
+def process_results(model_dir, lons = lons, lats  = lats, levels = None, naive_memory = False):
     yaml_file = os.path.join(model_dir, "hparams.yaml")
     params = yaml.unsafe_load(open(yaml_file))
+
+    if levels is None:
+        if "spcam" in params["dataset_params"]["test"]["dataset_file"]:
+            logger.info("setting levels to 30")
+            levels = LEVELS
+        else:
+            logger.info("setting levels to 26")
+            levels = LEVELS26
+
 
     test_data = torch.load(params["dataset_params"]["test"]["dataset_file"])["y"]
     if len(test_data.shape) == 5:

@@ -20,6 +20,7 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from gaia.plot import levels26, levels
+import yaml
 
 from gaia import get_logger
 
@@ -39,7 +40,7 @@ def get_checkpoint_file(file):
             raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
-def update_model_params_from_dataset(dataset_dict, model_params, mean_thres = 1e-13):
+def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-13):
 
     model_params["model_config"].update(
         {
@@ -57,7 +58,9 @@ def update_model_params_from_dataset(dataset_dict, model_params, mean_thres = 1e
     )
 
     if mean_thres > 0:
-        ignore_outputs = dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
+        ignore_outputs = (
+            dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
+        )
         loss_output_weights = torch.ones(ignore_outputs.shape[0])
         loss_output_weights[ignore_outputs] = 0.0
         logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
@@ -118,9 +121,10 @@ def get_train_val_test_split(files, interleave=False, seperate_val_set=False):
 
 def default_dataset_params(
     batch_size=24 * 96 * 144,
-    base = "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4"
+    base="/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
+    mean_thres=1e-13,
 ):
-    
+
     var_index_file = base + "_var_index.pt"
 
     return dict(
@@ -129,22 +133,23 @@ def default_dataset_params(
             batch_size=batch_size,
             shuffle=True,
             flatten=False,  # already flattened
-            var_index_file = var_index_file
+            var_index_file=var_index_file,
         ),
         val=dict(
             dataset_file=base + "_val.pt",
             batch_size=batch_size,
             shuffle=False,
             flatten=False,  # already flattened
-            var_index_file = var_index_file
+            var_index_file=var_index_file,
         ),
         test=dict(
             dataset_file=base + "_test.pt",
             batch_size=batch_size,
             shuffle=False,
             flatten=True,  # already flattened
-            var_index_file = var_index_file
+            var_index_file=var_index_file,
         ),
+        mean_thres=mean_thres,
     )
 
 
@@ -214,8 +219,15 @@ def default_model_params(**kwargs):
     return d
 
 
+def load_hparams_file(model_dir):
+    yaml_file = os.path.join(model_dir, "hparams.yaml")
+    if os.path.exists(yaml_file):
+        params = yaml.unsafe_load(open(yaml_file))
+        return params
+
+
 def default_trainer_params(**kwargs):
-    d = dict(precision=16)
+    d = dict(precision=16,max_epochs=200)
     d.update(kwargs)
     return d
 
@@ -234,8 +246,11 @@ def main(
     trainer_params=default_trainer_params(),
     dataset_params=default_dataset_params(),
     model_params=default_model_params(),
+    seed=None,
 ):
-    pl.seed_everything(345)
+    if seed:
+        logger.info("seeding everything")
+        pl.seed_everything(345)
 
     logger.info("starting a run with:")
     logger.info(f"trainer_params: \n{make_pretty_for_log(trainer_params)}")
@@ -245,6 +260,8 @@ def main(
     mode = mode.split(",")
 
     model_dir = None
+    trainer = None
+    val_dataloader = None
 
     if "train" in mode:
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
@@ -253,7 +270,13 @@ def main(
         # val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
         # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
 
-        update_model_params_from_dataset(train_dataset, model_params)
+        mean_thres = dataset_params["mean_thres"]
+
+        update_model_params_from_dataset(
+            train_dataset, model_params, mean_thres=mean_thres
+        )
+
+       
 
         model = TrainingModel(dataset_params=dataset_params, **model_params)
 
@@ -262,30 +285,50 @@ def main(
         # write_graph = WriteGraph()
 
         trainer = pl.Trainer(
-            max_epochs=200,
             callbacks=[checkpoint_callback],
             log_every_n_steps=max(1, len(train_dataloader) // 100),
             **trainer_params,
         )
 
-        if model_params.get("ckpt",None) is not None:
+        if model_params.get("ckpt", None) is not None:
             logger.info(f"loading existing ckpt {model_params}")
-            ckpt = model_params["ckpt"]
+            ckpt = get_checkpoint_file(model_params["ckpt"])
         else:
             ckpt = None
 
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
         model_dir = trainer.log_dir
 
-        #compute validation on best model
-        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
-        validation_score = trainer.validate(model, val_dataloader)
-        json.dump(validation_score, open(os.path.join(model_dir, "validation_score.json"),"w"))
+    if "val" in mode:
+        if model_dir is None:
+            assert "ckpt" in model_params
+            model_dir = model_params["ckpt"]
 
-        # del train_dataset
-        # del train_dataloader
-        # del val_dataset
-        # del val_dataloader
+        # compute validation on best model
+        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
+
+        if val_dataloader is None:
+            dataset_params = model.hparams.dataset_params
+
+            if "var_index_file" not in model.hparams.dataset_params["val"]:
+                logger.info("adding var index file")
+                model.hparams.dataset_params["val"]["var_index_file"] = model.hparams.dataset_params["val"]["dataset_file"].replace("_val.pt", "_var_index.pt")
+
+
+            val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+
+        if trainer is None:
+            trainer = pl.Trainer(
+                checkpoint_callback=False,
+                logger=False,
+                **trainer_params,
+            )
+
+        validation_score = trainer.validate(model, val_dataloader)
+        json.dump(
+            validation_score,
+            open(os.path.join(model_dir, "validation_score.json"), "w"),
+        )
 
     if "test" in mode:
 
@@ -293,32 +336,34 @@ def main(
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
-        model = TrainingModel.load_from_checkpoint(
-            get_checkpoint_file(model_dir)
-        )
-        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
+        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
+
+        #bug
+        if "var_index_file" not in model.hparams.dataset_params["test"]:
+            logger.info("adding var index file")
+            model.hparams.dataset_params["test"]["var_index_file"] = model.hparams.dataset_params["test"]["dataset_file"].replace("_test.pt", "_var_index.pt")
+
+
+        test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
 
         trainer = pl.Trainer(
-            log_every_n_steps=max(1, len(test_dataloader) // 100),
             checkpoint_callback=False,
             logger=False,
             **trainer_params,
         )
+
         test_results = trainer.test(model, dataloaders=test_dataloader)
         # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
         path_to_save = os.path.join(model_dir, "test_results.json")
         json.dump(test_results, open(path_to_save, "w"))
 
-
     if "predict" in mode:
-
 
         if model_dir is None:
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
-
-        test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
+        test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
 
         ### loading a different dataset
         interpolation_params = None
@@ -328,9 +373,10 @@ def main(
         # interpolation_params["input_grid"] = levels26
         # interpolation_params["output_grid"] = levels
 
-
         model = TrainingModel.load_from_checkpoint(
-            get_checkpoint_file(model_dir), strict=False, **{"interpolate":interpolation_params}
+            get_checkpoint_file(model_dir),
+            strict=False,
+            **{"interpolate": interpolation_params},
         )
 
         trainer = pl.Trainer(
@@ -339,7 +385,7 @@ def main(
             logger=False,
             **trainer_params,
         )
-        
+
         yhat = trainer.predict(model, dataloaders=test_dataloader)
         # return yhat
         yhat = torch.cat(yhat)
@@ -352,10 +398,6 @@ def main(
 
         torch.save(yhat, path_to_save)
 
-        del test_dataset
-        del test_dataloader
-        del yhat
-
     if "results" in mode:
 
         if model_dir is None:
@@ -363,4 +405,5 @@ def main(
             model_dir = model_params["ckpt"]
 
         logger.info("processing results")
-        process_results(model_dir, levels = levels26)
+
+        process_results(model_dir, levels=None)

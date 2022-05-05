@@ -2,12 +2,30 @@
 # Q,T,SHFLX,OMEGA
 
 
-python run.py
-# python run.py --input_var_ignore T
-# python run.py --input_var_ignore SHFLX
-# python run.py --input_var_ignore OMEGA
-#22 23 24
-# for v in 22 23 24
-# do
-#     python run.py --mode predict,results --ckpt lightning_logs/version_$v --gpu 4 --dataset /ssddg1/gaia/cam4/cam4-famip-30m-timestep_4
-# done
+
+
+# batch_size=$((24*96*144))
+
+
+
+# python run.py --ignore_input_variables OMEGA --memory_variables PRECT --gpu 1 &
+# python run.py --ignore_input_variables OMEGA --memory_variables PRECC --gpu 2 &
+# python run.py --ignore_input_variables OMEGA --memory_variables PTEQ --gpu 3 &
+# python run.py --ignore_input_variables OMEGA --memory_variables PTTEND --gpu 4 &
+# python run.py --ignore_input_variables OMEGA --gpu 5 &
+
+# python run.py --model_type memory --gpu 2 --memory_variables PRECC --dataset spcam --mode "train,test" --batch_size $batch_size
+
+ckpt="lightning_logs/version_13"
+batch_size=$((1*96*144))
+thres="1e-13"
+
+python run.py --mode "train,val,test" --ckpt $ckpt--num_layers 28 --hidden_size 2048 --gpu 1 --mean_thres $thres --batch_size $batch_size --max_epochs 1000
+# # python run.py $params --num_layers 7  --hidden_size 1024 --gpu 2 --mean_thres $thres --batch_size $batch_size &
+# # python run.py $params --num_layers 14 --hidden_size 512  --gpu 3 --mean_thres $thres --batch_size $batch_size &
+
+
+
+              
+
+

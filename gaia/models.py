@@ -218,8 +218,7 @@ class TrainingModel(LightningModule):
         num_dims = len(x.shape)
 
         if num_dims == 3 or num_dims == 5:
-            
-            # have history
+            # have history/memory
             x = x[:, -1, ...]  # only use last time stemps for state vars
             y1 = y[:, 0, ...]
             y2 = y[:, 1, ...]

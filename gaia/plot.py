@@ -324,6 +324,16 @@ levels26 = [
 ]
 
 
+def get_land_polies():
+    polys = [
+        np.array(p[0])
+        for p in pd.read_json(LAND_FILE)["features"].apply(
+            lambda a: a["geometry"]["coordinates"]
+        )
+    ]
+
+    return polys
+
 def get_land_outline():
     polys = [
         np.array(p[0])

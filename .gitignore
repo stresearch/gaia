@@ -124,6 +124,6 @@ stats.pt
 *.html
 *.nc
 **/libtorch
-
+*.mp4
 # keep
 !docs/**

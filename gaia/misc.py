@@ -7,6 +7,9 @@ from gaia.plot import get_land_polies
 import io
 import PIL
 import imageio_ffmpeg
+from gaia import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_polies():
@@ -61,7 +64,7 @@ def make_video(list_of_pil_images, use_numpy=False, fps=30, file_name="temp_vide
     writer.close()
 
 
-def make_video_for_two_model(model1, model2, output, var_index_file = None, output_folder = None, samples_per_day = 2):
+def make_video_for_two_model(model1, model2, output, file_name = "temp.mp4", samples_per_day = 2):
 
     model1_name, model1_file = model1
     model2_name, model2_file = model2
@@ -130,7 +133,7 @@ def make_video_for_two_model(model1, model2, output, var_index_file = None, outp
 
     # plot abs error
     abs_err = (y1 - y2).abs().reshape(-1, samples_per_day, 96, 144).mean(1)
-    zmax = (abs_err.mean() + 3*abs_err.std()).clip(max - abs_err.max()).item()
+    zmax = (abs_err.mean() + 3*abs_err.std()).clip(max = abs_err.max()).item()
     temp = abs_err.numpy()
 
     title = f"output:{output_name}, abs_error({model1_name},{model2_name})"
@@ -139,18 +142,20 @@ def make_video_for_two_model(model1, model2, output, var_index_file = None, outp
                                     land = land, zmin = 0, zmax = zmax, title = title, cmap_name="Reds")
 
 
-    # plot abs perc error
-    mean_per_loc = abs_err.mean(dims=[0],keepdims = True).clip(min = 1e-10)
-    temp = (abs_err / mean_per_loc).clip(max = 1.).numpy()
+    # # plot abs perc error
+    # mean_per_loc = abs_err.mean(dim=[0],keepdims = True).clip(min = 1e-10)
+    # temp = (abs_err / mean_per_loc).clip(max = 1.).numpy()
 
-    title = f"output:{output_name}, abs_error_perc({model1_name},{model2_name})"
-    figures[f"abs_error_perc-{model1_name}-{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
-                                    land = land, zmin = 0, zmax = 1, title = title, cmap_name="Oranges")
+    # title = f"output:{output_name}, abs_error_perc({model1_name},{model2_name})"
+    # figures[f"abs_error_perc-{model1_name}-{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
+    #                                 land = land, zmin = 0, zmax = 1, title = title, cmap_name="Oranges")
 
 
     # skill
 
-    temp = (1. - (y1 - y2).square().reshape(-1, samples_per_day, 96, 144).mean(1) / y1.var(dims = [0],keepdims = True)).clip(0,1).numpy()
+    temp = (1. - (y1 - y2).square().reshape(-1, samples_per_day, 96, 144).mean(1) / y1.var(dim = [0],keepdims = True)).clip(0,1).numpy()
+
+    title = f"output:{output_name}, skill-temporal({model1_name},{model2_name})"
 
     figures[f"skill-{model1_name}-{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
                                     land = land, zmin = 0, zmax = 1, title = title, cmap_name="Greens")
@@ -158,9 +163,14 @@ def make_video_for_two_model(model1, model2, output, var_index_file = None, outp
 
     
 
-    row1 = np.concatenate([figures[model1_name], figures[model2_name]],axis = 2)
-    row2 = np.concatenate([figures[f"abs_error {m1} {m2}"], figures[f"skill {m1} {m2}"]], axis = 2)
+    row1 = np.concatenate([figures[f"{model1_name}-{output_name}"], figures[f"{model2_name}-{output_name}"]],axis = 2)
+    row2 = np.concatenate([figures[f"abs_error-{model1_name}-{model2_name}-{output_name}"],
+                           figures[f"skill-{model1_name}-{model2_name}-{output_name}"]], axis = 2)
     grid = np.concatenate([row1,row2], axis = 1)
+
+    make_video(grid, use_numpy=True, fps = 10, file_name = file_name)
+
+
 
 
 

@@ -247,6 +247,7 @@ def main(
     dataset_params=default_dataset_params(),
     model_params=default_model_params(),
     seed=None,
+    interpolation_params = None
 ):
     if seed:
         logger.info("seeding everything")
@@ -363,21 +364,24 @@ def main(
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
-        test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
-
-        ### loading a different dataset
-        interpolation_params = None
-        # interpolation_params = dict()
-        # interpolation_params["input_index"] = test_dataset["input_index"]
-        # interpolation_params["output_index"] = test_dataset["output_index"]
-        # interpolation_params["input_grid"] = levels26
-        # interpolation_params["output_grid"] = levels
 
         model = TrainingModel.load_from_checkpoint(
             get_checkpoint_file(model_dir),
             strict=False,
             **{"interpolate": interpolation_params},
         )
+
+        ### loading a different dataset
+        if interpolation_params:
+            logger.info("running interpolation")
+            test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
+            prediction_file_name = interpolation_params["prediction_file_name"]
+        else:
+            test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
+            prediction_file_name = "predictions.pt"
+
+
+       
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),
@@ -394,7 +398,7 @@ def main(
             yhat = unflatten_tensor(yhat)
 
         # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(model_dir, "predictions.pt")
+        path_to_save = os.path.join(model_dir, prediction_file_name)
 
         torch.save(yhat, path_to_save)
 

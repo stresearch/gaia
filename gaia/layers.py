@@ -25,6 +25,7 @@ class Normalization(torch.nn.Module):
                 raise ValueError("data must be either 2 or 4 dimensional")
 
 class InterpolateGrid1D(torch.nn.Module):
+    log_linear_vars = ("Q",)
     def __init__(self,*,input_grid = None, output_grid=None, input_grid_index = None, output_grid_index = None):
         super().__init__()
         self.linear = torch.nn.Linear(len(input_grid), len(output_grid),bias=False)
@@ -40,7 +41,11 @@ class InterpolateGrid1D(torch.nn.Module):
             if e-s == 1:
                 out.append(x[:,s:e])
             else:
-                out.append(self.linear(x[:,s:e]))
+                if k in self.log_linear_vars:
+                    out.append(self.linear(x[:,s:e].log()).exp())
+                else:
+                    out.append(self.linear(x[:,s:e]))
+
         return torch.cat(out,-1)
 
 def make_interpolation_weights(output_grid, input_grid):

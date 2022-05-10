@@ -29,6 +29,7 @@ dataset_names = {
     "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
 }
 
+mean_thres_defaults = {"cam4" : 1e-13, "spcam": 1e-15}
 
 def run():
     parser = argparse.ArgumentParser()
@@ -49,10 +50,14 @@ def run():
     parser.add_argument("--num_layers", default=7, type=int)
     parser.add_argument("--batch_size", default=10 * 96 * 144, type=int)
     parser.add_argument("--dropout", default=0.01, type=float)
-    parser.add_argument("--mean_thres", default=1e-15, type=float)
+    parser.add_argument("--mean_thres", default=None, type=float)
     parser.add_argument("--max_epochs", default=200, type=int)
 
     args = parser.parse_args()
+
+    mean_thres_defaults = {"cam4" : 1e-13, "spcam": 1e-15}
+    args.mean_thres = mean_thres_defaults[args.dataset]
+
 
     args.dataset = dataset_names[args.dataset]
 

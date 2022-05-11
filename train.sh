@@ -17,11 +17,15 @@
 # python run.py --model_type memory --gpu 2 --memory_variables PRECC --dataset spcam --mode "train,test" --batch_size $batch_size
 
 # ckpt="lightning_logs/version_13"
-batch_size=$((2*96*144))
-thres="1e-13"
+# batch_size=$((2*96*144))
+# thres="1e-13"
+
+python run.py --mode "results" --ckpt lightning_logs_compare_models/spcam_nn
+python run.py --mode "results" --ckpt lightning_logs_compare_models/cam4_nn
+
 
 # python run.py --mode "train,val,test" --ckpt $ckpt --num_layers 28 --hidden_size 2048 --gpu 4 --mean_thres $thres --batch_size $batch_size --max_epochs 1000
-python run.py --mode "train,val,test" --num_layers 21 --hidden_size 1536 --gpu 3 --mean_thres $thres --batch_size $batch_size --max_epochs 1000
+# python run.py --mode "train,val,test" --num_layers 21 --hidden_size 1536 --gpu 3 --mean_thres $thres --batch_size $batch_size --max_epochs 1000
 # python run.py --mode "train,val,test" --ckpt $ckpt --num_layers 28 --hidden_size 2048 --gpu 4 --mean_thres $thres --batch_size $batch_size --max_epochs 1000
 
 # # python run.py $params --num_layers 7  --hidden_size 1024 --gpu 2 --mean_thres $thres --batch_size $batch_size &

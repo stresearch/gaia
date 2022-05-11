@@ -410,4 +410,10 @@ def main(
 
         logger.info("processing results")
 
-        process_results(model_dir, levels=None)
+        other_predictions = None
+        if "cam4" in model_dir:
+            other_predictions = "lightning_logs_compare_models/spcam_nn/predictions_on_cam4.pt"
+        else:
+            other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
+
+        process_results(model_dir, levels=None, other_predictions=other_predictions)

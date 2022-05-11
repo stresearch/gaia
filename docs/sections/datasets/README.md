@@ -1,11 +1,5 @@
-## Welcome to DARPA AIE ACTM: Gaia Team Project Page
-
-### Team
-- [STR](str.us)
-- [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
-
-### Datasets
-#### GCM
+# Datasets
+## GCM
 - [Community Atmospheric Model (CAM4)](https://www.cesm.ucar.edu/models/ccsm4.0/cam/)
 - 30 minute time-step
 - 2.5-degree grid (144x96)
@@ -13,7 +7,7 @@
 - One year debug run (1979 SST; Time Varying) been extended to four than ten years.
 - Outputs every 3 hours + additional model time-step (memory)
 
-#### CRM
+## CRM
 - [SPCAM (super parameterized CAM)](https://ncar.github.io/CAM/doc/build/html/users_guide/atmospheric-configurations.html#super-parameterized-cam-spcam)
 - 20 minute time-step
 - 16 SAM (The System for Atmospheric Modeling) Columns
@@ -24,7 +18,7 @@
   - Morrison Microphysics + Higher-order turbulence closure scheme, Cloud Layers Unified By Binormals (CLUBB)
 - Outputs every 3 hours + additional model time-step (memory)
 
-#### LES
+## LES
 - [WRF (Weather Research and Forecasting Model)](https://www2.mmm.ucar.edu/wrf/users/model_overview.html)
 - 50 km x 50 km domains; periodic boundary conditions
 - 100 levels
@@ -34,18 +28,9 @@
 - History outputs at 10 minutes (horizontally averaged and mapped to same vertical grid as CAM4)
 
 
-### Approach
+## Approach
 - Develop an AI surrogate to parametric atmospheric physics models used by a GCM at sub-grid scales
 - Refine the surrogate using a fine-grid (200m) LES model, focusing on environmental regimes relevant to the MJO and "super-MJO" tipping points
 - Novel memory feauture helps the surrogate capture persistent local convection phenomena
 - Embed into a GCM to produce a multi-scale AI hybrid model that for the first time accurately captures MJO-relevant convection aggregation at all scales > 200m
 - Exploit manifold learning to characterize MJO tipping points and signatures, refining the surrogate as needed
-
-### Milestone Reports
-
-- [Milestone Report 1](milestone_report_1.pdf)
-- [Milestone Report 2](milestone_report_2.pdf)
-
-
-[.](sdfhj32fsfva/results.md)  
-[,](_index.md)

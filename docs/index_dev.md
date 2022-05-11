@@ -1,4 +1,6 @@
-# Welcome to DARPA AIE ACTM: Gaia Team Project Page
+# Welcome to GAIA Team Project Page
+
+GAIA is a DARPA AIE ACTM project
 
 ## Team
 - [STR](str.us)

@@ -9,23 +9,27 @@
 
 ## CAM4 Simulation vs CAM4-trained Neural Network
 
-[![interactive](cam4_sim-cam4_nn.png)](cam4_sim-cam4_nn.html)
+[*Means for each model, MSE and Skill (click here for interactive plot).*](cam4_sim-cam4_nn.html)
+[![](cam4_sim-cam4_nn.png)](cam4_sim-cam4_nn.png)
 
 ## SPCAM Simulation vs SPCAM-trained Neural Network
 
-[![interactive](spcam_sim-spcam_nn.png)](spcam_sim-spcam_nn.html)
+[*Means for each model, MSE and Skill (click here for interactive plot).*](spcam_sim-spcam_nn.html)
+[![](spcam_sim-spcam_nn.png)](spcam_sim-spcam_nn.png)
 
 ## CAM4-trained Neural Network vs SPCAM-trained Neural Network
 
 Both models are evaluated on the CAM4 input datas
 
-[![interactive](cam4_nn-spcam_nn.png)](cam4_nn-spcam_nn.html)
+[*Means for each model, MSE and Skill (click here for interactive plot).*](cam4_nn-spcam_nn.html)
+[![](cam4_nn-spcam_nn.png)](cam4_nn-spcam_nn.png)
 
 ## SPCAM-trained Neural Network vs CAM4-trained Neural Network
 
 Both models are evaluated on the SPCAM input datas
 
-[![interactive](spcam_nn-cam4_nn.png)](spcam_nn-cam4_nn.html)
+[*Means for each model, MSE and Skill (click here for interactive plot).*](spcam_nn-cam4_nn.html)
+[![](spcam_nn-cam4_nn.png)](spcam_nn-cam4_nn.png)
 
 
 ## Animations of Model Performance and Comparison Over Time

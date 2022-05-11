@@ -1,5 +1,11 @@
 # Videos
 
+Videos showing:
+- output over time for two models
+- absolute error between model outputs
+- skill-like metric where variance is computed over the time component
+
+Table columns:
 - model1 - name of first model
 - model2 - name of second model
 - output - output variable

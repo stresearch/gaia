@@ -1,6 +1,6 @@
 # GCM Integration
 
-
+Refer to our deployment repo https://github.com/stresearch/gaia-deploy
 
 ## Exporting Pytorch Model
 

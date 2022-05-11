@@ -1,3 +1,4 @@
+from sympy import maximum
 import torch
 import tqdm.auto as tqdm
 import plotly.express as px
@@ -64,7 +65,7 @@ def make_video(list_of_pil_images, use_numpy=False, fps=30, file_name="temp_vide
     writer.close()
 
 
-def make_video_for_two_model(model1, model2, output, file_name = "temp.mp4", samples_per_day = 2):
+def make_video_for_two_model(model1, model2, output, file_name = "temp.mp4", symmetric = False, samples_per_day = 2):
 
     model1_name, model1_file = model1
     model2_name, model2_file = model2
@@ -109,25 +110,33 @@ def make_video_for_two_model(model1, model2, output, file_name = "temp.mp4", sam
 
     
 
+    cmap_name = "blues" if not symmetric else "RdBu"
+    
+
     ## reduce to 1 per day
     temp = y1.reshape(-1, samples_per_day, 96, 144).mean(1)
     mn = temp.mean()
     st = 3*temp.std()
     zmin =  (mn - st).clip(min =temp.min()).item()
     zmax =  (mn + st).clip(max = temp.max()).item()
+
+    if symmetric:
+        zmax = max([np.abs(zmax), np.abs(zmin)])
+        zmin = -zmax
+
     days = range(temp.shape[0])
 
     temp = temp.numpy()
 
     title = f"model:{model1_name}, output:{output_name}"
     figures[f"{model1_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
-                                    land = land, zmin = zmin, zmax = zmax, title = title)
+                                    land = land, zmin = zmin, zmax = zmax, title = title, cmap_name=cmap_name)
 
 
     temp = y2.reshape(-1, samples_per_day, 96, 144).mean(1).numpy()
     title = f"model:{model2_name}, output:{output_name}"
     figures[f"{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
-                                    land = land, zmin = zmin, zmax = zmax, title = title)
+                                    land = land, zmin = zmin, zmax = zmax, title = title,cmap_name=cmap_name)
 
 
 

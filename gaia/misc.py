@@ -142,14 +142,16 @@ def make_video_for_two_model(model1, model2, output, file_name = "temp.mp4", sam
                                     land = land, zmin = 0, zmax = zmax, title = title, cmap_name="Reds")
 
 
-    # # plot abs perc error
-    # mean_per_loc = abs_err.mean(dim=[0],keepdims = True).clip(min = 1e-10)
-    # temp = (abs_err / mean_per_loc).clip(max = 1.).numpy()
+    # plot abs perc error
+    mean_per_loc = abs_err.mean(dim=[0],keepdims = True).clip(min = 1e-10)
+    temp = (abs_err / mean_per_loc).clip(max = 1.).numpy()
 
-    # title = f"output:{output_name}, abs_error_perc({model1_name},{model2_name})"
-    # figures[f"abs_error_perc-{model1_name}-{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
-    #                                 land = land, zmin = 0, zmax = 1, title = title, cmap_name="Oranges")
+    title = f"output:{output_name}, abs_error_perc({model1_name},{model2_name})"
+    figures[f"abs_error_perc-{model1_name}-{model2_name}-{output_name}"] = make_figure_image_arrays(temp, x = lons, y = lats, ts =days,
+                                    land = land, zmin = 0, zmax = 1, title = title, cmap_name="Oranges")
 
+    
+    make_video(figures[f"abs_error_perc-{model1_name}-{model2_name}-{output_name}"], use_numpy=True, fps = 10, file_name = file_name.replace(".mp4","-abs_error_perc.mp4"))
 
     # skill
 

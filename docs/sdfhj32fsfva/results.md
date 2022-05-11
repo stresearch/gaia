@@ -60,3 +60,6 @@
 [With Memory](spcam/plots_memory.html), 
 [Only Memory](spcam/plots_naive.html)
 
+#### Videos
+[videos](videos.md)
+

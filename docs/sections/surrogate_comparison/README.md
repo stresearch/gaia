@@ -1,11 +1,10 @@
-# Comparison of Surrugate Models
+# Comparison of Surrugate Models <!-- omit in toc -->
 
-- [Comparison of Surrugate Models](#comparison-of-surrugate-models)
-  - [CAM4 Simulation vs CAM4-trained Neural Network](#cam4-simulation-vs-cam4-trained-neural-network)
-  - [SPCAM Simulation vs SPCAM-trained Neural Network](#spcam-simulation-vs-spcam-trained-neural-network)
-  - [CAM4-trained Neural Network vs SPCAM-trained Neural Network](#cam4-trained-neural-network-vs-spcam-trained-neural-network)
-  - [SPCAM-trained Neural Network vs CAM4-trained Neural Network](#spcam-trained-neural-network-vs-cam4-trained-neural-network)
-  - [Animations of Model Performance and Comparison Over Time](#animations-of-model-performance-and-comparison-over-time)
+- [CAM4 Simulation vs CAM4-trained Neural Network](#cam4-simulation-vs-cam4-trained-neural-network)
+- [SPCAM Simulation vs SPCAM-trained Neural Network](#spcam-simulation-vs-spcam-trained-neural-network)
+- [CAM4-trained Neural Network vs SPCAM-trained Neural Network](#cam4-trained-neural-network-vs-spcam-trained-neural-network)
+- [SPCAM-trained Neural Network vs CAM4-trained Neural Network](#spcam-trained-neural-network-vs-cam4-trained-neural-network)
+- [Animations of Model Performance and Comparison Over Time](#animations-of-model-performance-and-comparison-over-time)
 
 ## CAM4 Simulation vs CAM4-trained Neural Network
 

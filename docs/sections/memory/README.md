@@ -1,36 +1,22 @@
-# Baseline Surrogate Model <!-- omit in toc --> 
+# Adding Memory to Surrogate Model
 
-- [Surrogate Architecture](#surrogate-architecture)
-- [Hyperparameters](#hyperparameters)
-- [Dataset Variables](#dataset-variables)
-  - [Inputs](#inputs)
-  - [Outputs](#outputs)
+We evalate improvement in skill when adding additional memory input to the surrogate model
+- We test adding output variable from the previous time steps as an additional input
+- We measure improvement in skill for multiple cases (on the SPCAM trained model)
+  - Adding one memory variable at a time
+  - Adding all variables
+  - Same as above but removing OMEGA as an input
+- Note that PRECT, PRECC are scalars while PTEQ and PTTEND are vector values at 30 levels
+- As expected, adding memory of output variable X, improves skill in predicting that variable
 
-## Surrogate Architecture
+[![](memory_skill.png)](memory_skill.png)
 
-- 7 FCN (fully connected layers)
-- Each layer has a hidden dimension of 512.
-- Each layer is followed by batch normalization and dropout with rate of .1
+We can further break down skill by output variable
 
-[![](surrogate_architecture.png)](surrogate_architecture.png)
-
-
-## Hyperparameters
-
-We evaluate several parameter values:
-- num_layers: 3,5,7,14
-- hidden_size: 128, 256, 512, 1024, 1536
-
-[![](baseline_hparams.png)](baseline_hparams.png)
+[![](memory_skill_output_sep.png)](memory_skill_output_sep.png)
 
 
-## Dataset Variables
-
-
-Shapes are (timesteps (T), number of levels (L), number of lat bins, number of lon bins)
-
-- CAM4 has L =  L levels
-- SPCAM has L = L levels
+## Variable names for reference
 
 ### Inputs
 
@@ -59,4 +45,3 @@ Shapes are (timesteps (T), number of levels (L), number of lat bins, number of l
 | PRECC | Convective precipitation rate (liq + ice) | (T, 96, 144) | m/s|
 | PTEQ | Q total physics tendency | (T, L, 96, 144) | kg/kg/s|
 | PTTEND | T total physics tendency | (T, L, 96, 144) | K/s|
-

@@ -1,36 +1,15 @@
-# Baseline Surrogate Model <!-- omit in toc --> 
+# Input Variable Abalstion
 
-- [Surrogate Architecture](#surrogate-architecture)
-- [Hyperparameters](#hyperparameters)
-- [Dataset Variables](#dataset-variables)
-  - [Inputs](#inputs)
-  - [Outputs](#outputs)
+Ablation of input variable groups is performed on the surrogate model trained CAM4 data. We measure over skill on a test set as we remove one variable (group) at a time
 
-## Surrogate Architecture
+- Each line corresponds to skill per output variable (note that PTEQ and PTTEND have 26 levels each while PRECC, PRECT are scalars)
+- Dashed lines correspond to skill for each output with all input variables
+- We observe that OMEGA, Q, T have the greatest impact
 
-- 7 FCN (fully connected layers)
-- Each layer has a hidden dimension of 512.
-- Each layer is followed by batch normalization and dropout with rate of .1
-
-[![](surrogate_architecture.png)](surrogate_architecture.png)
+[![](ablation_baseline.png)](ablation_baseline.png)
 
 
-## Hyperparameters
-
-We evaluate several parameter values:
-- num_layers: 3,5,7,14
-- hidden_size: 128, 256, 512, 1024, 1536
-
-[![](baseline_hparams.png)](baseline_hparams.png)
-
-
-## Dataset Variables
-
-
-Shapes are (timesteps (T), number of levels (L), number of lat bins, number of lon bins)
-
-- CAM4 has L =  L levels
-- SPCAM has L = L levels
+## Variable names for reference
 
 ### Inputs
 
@@ -59,4 +38,7 @@ Shapes are (timesteps (T), number of levels (L), number of lat bins, number of l
 | PRECC | Convective precipitation rate (liq + ice) | (T, 96, 144) | m/s|
 | PTEQ | Q total physics tendency | (T, L, 96, 144) | kg/kg/s|
 | PTTEND | T total physics tendency | (T, L, 96, 144) | K/s|
+
+
+
 

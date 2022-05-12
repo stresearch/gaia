@@ -6,7 +6,12 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 - [Milestone Reports](#milestone-reports)
 
 ## Team <!-- omit in toc --> 
-- [STR](https://www.str.us)
+
+![](https://www.str.us/wp-content/uploads/2021/05/badge-teal-1.svg)
+![](https://www.unsw.edu.au/content/dam/images/graphics/logos/unsw/unsw_0.png)
+
+
+- [STR](https://www.str.us) 
 - [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
 
 ## Sections

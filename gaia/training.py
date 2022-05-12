@@ -162,6 +162,7 @@ def default_dataset_params_v1(
     inputs=["T", "Q", "RELHUM", "U", "V"],
     outputs=["PTEQ", "PTTEND", "PRECT"],
 ):
+    raise DeprecationWarning
     files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
     train_files, val_files, test_files = get_train_val_test_split(
         files, interleave=interleave, seperate_val_set=seperate_val_set
@@ -411,9 +412,9 @@ def main(
         logger.info("processing results")
 
         other_predictions = None
-        if "cam4" in model_dir:
-            other_predictions = "lightning_logs_compare_models/spcam_nn/predictions_on_cam4.pt"
-        else:
-            other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
+        # if "cam4" in model_dir:
+        #     other_predictions = "lightning_logs_compare_models/spcam_nn/predictions_on_cam4.pt"
+        # else:
+        #     other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)

@@ -31,11 +31,13 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 **What’s hard?**
 - GCMs are computationally expensive and lack the resolution needed to adequately model local convection and thus clouds
 - This greatly increases GCM forecast errors and impedes propagation of large-scale wave phenomena such as the MJO 
-- 
+
+
 **What will GAIA accomplish?**
 - Enable a GCM to accurately model local convection and predict self-organizing atmospheric wave phenomena 
 - Exploit this GCM to explore possible future regimes and identify early warning signatures for MJO-related tipping points.
-- 
+  
+
 **Progress**
 - Developed and validated high-skill AI surrogates for multiple GCM local models, including CAM4, SPCAM with Morrison micro-physics, SPCAM with CLUBB cloud parameterization
 - Currently studying impact of added memory and ablating inputs
@@ -44,6 +46,7 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
   - Analyze GCM sensitivity using lower order dynamical model 
   - Apply results to selectively enhance local surrogate using ultra-high-resolution local eddy simulation for training. 
   - Integrate surrogate into GCM; use GCM to test MJO hypotheses
+
 
 ## Milestone Reports
 

@@ -5,7 +5,6 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 - [Overview](#overview)
 - [Milestone Reports](#milestone-reports)
 
-
 ## Team <!-- omit in toc --> 
 - [STR](www.str.us)
 - [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
@@ -21,6 +20,9 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 
 
 ## Overview
+
+*Animation of CAM4 Simulation and Neural Network Surrogate Model*
+[![](sections/overview/overview_screenshot.png)](https://855da60d-505b-4eee-942c-e19fb87dcc5f.s3.amazonaws.com/gaia/videos/cam4_sim-cam4_nn-PRECT.mp4)
 
 **Concept & Approach**
 - Develop new hybrid AI tools and methods to accelerate ultra-high-resolution Global Climate Models (GCMs) models, substituting AI local surrogates to improve cloud-resolving physics
@@ -50,8 +52,6 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 
 ## Milestone Reports
 
-- [Milestone Report 1](milestone_report_1.pdf)
-- [Milestone Report 2](milestone_report_2.pdf)
+- [Milestone Report 1](milestone_reports/milestone_report_1.pdf)
+- [Milestone Report 2](milestone_reports/milestone_report_2.pdf)
 
-
-[.](sdfhj32fsfva/results.md)

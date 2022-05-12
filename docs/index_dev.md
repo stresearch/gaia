@@ -1,19 +1,12 @@
-# Welcome to GAIA Team Project Page
+# Global AI Accelerator - GAIA <!-- omit in toc --> 
 
-GAIA is a DARPA AIE ACTM project
-
-## Team
-- [STR](str.us)
+Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
+- [Sections](#sections)
+- [Overview](#overview)
+- [Milestone Reports](#milestone-reports)
+## Team <!-- omit in toc --> 
+- [STR](www.str.us)
 - [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
-
-
-## Approach
-- Develop an AI surrogate to parametric atmospheric physics models used by a GCM at sub-grid scales
-- Refine the surrogate using a fine-grid (200m) LES model, focusing on environmental regimes relevant to the MJO and "super-MJO" tipping points
-- Novel memory feauture helps the surrogate capture persistent local convection phenomena
-- Embed into a GCM to produce a multi-scale AI hybrid model that for the first time accurately captures MJO-relevant convection aggregation at all scales > 200m
-- Exploit manifold learning to characterize MJO tipping points and signatures, refining the surrogate as needed
-- 
 
 ## Sections
 - [Datasets](sections/datasets/README.md) - description of datasets used in surrogate training
@@ -23,6 +16,32 @@ GAIA is a DARPA AIE ACTM project
 - [Surrogate with Memory Inputs](sections/memory/README.md) - improving surrogate performance by adding memory i.e. outputs from previous timestep
 - [Integration of AI Surrogate into GCM](sections/gcm_integration/README.md) - deploying GAIA ML model in the GCM
 - [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets
+
+
+## Overview
+
+**Concept & Approach**
+- Develop new hybrid AI tools and methods to accelerate ultra-high-resolution Global Climate Models (GCMs) models, substituting AI local surrogates to improve cloud-resolving physics
+- Test climate “tipping point” hypotheses, with focus on the Madden Julian Oscillation (MJO) 
+
+![](sections/overview/overview.png)
+
+**What’s hard?**
+- GCMs are computationally expensive and lack the resolution needed to adequately model local convection and thus clouds
+- This greatly increases GCM forecast errors and impedes propagation of large-scale wave phenomena such as the MJO 
+- 
+**What will GAIA accomplish?**
+- Enable a GCM to accurately model local convection and predict self-organizing atmospheric wave phenomena 
+- Exploit this GCM to explore possible future regimes and identify early warning signatures for MJO-related tipping points.
+- 
+**Progress**
+- Developed and validated high-skill AI surrogates for multiple GCM local models, including CAM4, SPCAM with Morrison micro-physics, SPCAM with CLUBB cloud parameterization
+- Currently studying impact of added memory and ablating inputs
+- Next Steps: 
+  - Determine input regimes where CAM/SPCAM underperform
+  - Analyze GCM sensitivity using lower order dynamical model 
+  - Apply results to selectively enhance local surrogate using ultra-high-resolution local eddy simulation for training. 
+  - Integrate surrogate into GCM; use GCM to test MJO hypotheses
 
 ## Milestone Reports
 

@@ -1,4 +1,4 @@
-# Input Variable Abalstion
+# Input Variable Ablation
 
 Ablation of input variable groups is performed on the surrogate model trained CAM4 data. We measure over skill on a test set as we remove one variable (group) at a time
 

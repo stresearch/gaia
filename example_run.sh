@@ -1,0 +1,1 @@
+python run.py --mode "train,val,test" --gpu 3 --training_params.num_epochs.another 100

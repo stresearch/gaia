@@ -1,10 +1,54 @@
-# Comparison of Surrugate Models <!-- omit in toc -->
+# Comparison of Surrogate Models <!-- omit in toc -->
 
+- [Summary](#summary)
 - [CAM4 Simulation vs CAM4-trained Neural Network](#cam4-simulation-vs-cam4-trained-neural-network)
 - [SPCAM Simulation vs SPCAM-trained Neural Network](#spcam-simulation-vs-spcam-trained-neural-network)
 - [CAM4-trained Neural Network vs SPCAM-trained Neural Network](#cam4-trained-neural-network-vs-spcam-trained-neural-network)
 - [SPCAM-trained Neural Network vs CAM4-trained Neural Network](#spcam-trained-neural-network-vs-cam4-trained-neural-network)
 - [Animations of Model Performance and Comparison Over Time](#animations-of-model-performance-and-comparison-over-time)
+
+
+## Summary
+
+Predictions of two models are compared on the specified dataset.
+- To compute skill the first model is used as "reference" i.e. to compute the variance
+- For PTEQ* skill, high altitude levels are ignored since they are mostly zero/process noise
+
+> comparison: cam4_sim-cam4_nn, dataset: cam4
+
+|output|skill|mse|
+|---|---|---|
+|PRECT|0.965|1.51e-16|
+|PRECC|0.956|7.15e-17|
+|PTEQ*|0.874|4.2e-17|
+|PTTEND|0.929|1.07e-10|
+
+> comparison: cam4_nn-spcam_nn, dataset: cam4
+  
+|output|skill|mse|
+|---|---|---|
+|PRECT|0.682|1.14e-15|
+|PRECC|0.0|2.29e-15|
+|PTEQ*|0.219|1.1e-17|
+|PTTEND|0.363|1.13e-09|
+
+> comparison: spcam_sim-spcam_nn, dataset: spcam 
+
+|output|skill|mse|
+|---|---|---|
+|PRECT|0.947|4.72e-16|
+|PRECC|0.947|4.72e-16|
+|PTEQ*|0.693|3.2e-16|
+|PTTEND|0.85|3.28e-10|
+
+> comparison: spcam_nn-cam4_nn, dataset: spcam 
+
+|output|skill|mse|
+|---|---|---|
+|PRECT|0.902|8.41e-16|
+|PRECC|0.4|5.16e-15|
+|PTEQ*|0.505|2.19e-16|
+|PTTEND|0.607|7.7e-10|
 
 ## CAM4 Simulation vs CAM4-trained Neural Network
 

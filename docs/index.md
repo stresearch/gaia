@@ -1,52 +1,60 @@
-## Welcome to DARPA AIE ACTM: Gaia Team Project Page
+# Global AI Accelerator - GAIA <!-- omit in toc --> 
 
-### Team
-- [STR](str.us)
+Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
+- [Sections](#sections)
+- [Overview](#overview)
+- [Milestone Reports](#milestone-reports)
+
+## Team <!-- omit in toc --> 
+
+![](sections/overview/str.png)   ![](https://www.unsw.edu.au/content/dam/images/graphics/logos/unsw/unsw_0.png)
+
+- [STR](https://www.str.us) 
 - [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
 
-### Datasets
-#### GCM
-- [Community Atmospheric Model (CAM4)](https://www.cesm.ucar.edu/models/ccsm4.0/cam/)
-- 30 minute time-step
-- 2.5-degree grid (144x96)
-- 30 levels
-- One year debug run (1979 SST; Time Varying) been extended to four than ten years.
-- Outputs every 3 hours + additional model time-step (memory)
-
-#### CRM
-- [SPCAM (super parameterized CAM)](https://ncar.github.io/CAM/doc/build/html/users_guide/atmospheric-configurations.html#super-parameterized-cam-spcam)
-- 20 minute time-step
-- 16 SAM (The System for Atmospheric Modeling) Columns
-- 26 levels
-- Year 2000 SST (Climatology)
-- Three year simulations:
-  -  Morrison Microphysics + Conventional parameterization for moist convection and large-scale condensation.
-  - Morrison Microphysics + Higher-order turbulence closure scheme, Cloud Layers Unified By Binormals (CLUBB)
-- Outputs every 3 hours + additional model time-step (memory)
-
-#### LES
-- [WRF (Weather Research and Forecasting Model)](https://www2.mmm.ucar.edu/wrf/users/model_overview.html)
-- 50 km x 50 km domains; periodic boundary conditions
-- 100 levels
-- 100 weather cases
-- 1 week spin up at 2 km + 5 day simulation at 200m resolution (LES)
-- 3 hourly Boundary Conditions by SPCAM runs + nudging of state variables
-- History outputs at 10 minutes (horizontally averaged and mapped to same vertical grid as CAM4)
+## Sections
+- [Datasets](sections/datasets/README.md) - description of datasets used in surrogate training
+- [Surrogate Details and Hyperparameter Sweeps](sections/baseline_hparams/README.md) - neural network architecture and hyperparameter comparison
+- [Comparison of Surrogates Trained on Different Datasets](sections/surrogate_comparison/README.md) - compare surrogates to CAM4, SPCAM simulations and compare CAM4 and SPCAM4 trained surrogates to each other
+- [Baseline Input Ablation](sections/baseline_input_ablation/README.md) - ablation of input variables and their effect on model performance
+- [Surrogate with Memory Inputs](sections/memory/README.md) - improving surrogate performance by adding memory i.e. outputs from previous timestep
+- [Integration of AI Surrogate into GCM](sections/gcm_integration/README.md) - deploying GAIA ML model in the GCM
+- [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets
 
 
-### Approach
-- Develop an AI surrogate to parametric atmospheric physics models used by a GCM at sub-grid scales
-- Refine the surrogate using a fine-grid (200m) LES model, focusing on environmental regimes relevant to the MJO and "super-MJO" tipping points
-- Novel memory feauture helps the surrogate capture persistent local convection phenomena
-- Embed into a GCM to produce a multi-scale AI hybrid model that for the first time accurately captures MJO-relevant convection aggregation at all scales > 200m
-- Exploit manifold learning to characterize MJO tipping points and signatures, refining the surrogate as needed
+## Overview
 
-### Milestone Reports
+*Animation of CAM4 Simulation and Neural Network Surrogate Model*
+[![](sections/overview/overview_screenshot.png)](https://855da60d-505b-4eee-942c-e19fb87dcc5f.s3.amazonaws.com/gaia/videos/cam4_sim-cam4_nn-PRECT.mp4)
 
-- [Milestone Report 1](milestone_report_1.pdf)
-- [Milestone Report 2](milestone_report_2.pdf)
+**Concept & Approach**
+- Develop new hybrid AI tools and methods to accelerate ultra-high-resolution Global Climate Models (GCMs) models, substituting AI local surrogates to improve cloud-resolving physics
+- Test climate “tipping point” hypotheses, with focus on the Madden Julian Oscillation (MJO) 
+
+![](sections/overview/overview.png)
+
+**What’s hard?**
+- GCMs are computationally expensive and lack the resolution needed to adequately model local convection and thus clouds
+- This greatly increases GCM forecast errors and impedes propagation of large-scale wave phenomena such as the MJO 
 
 
-[.](sdfhj32fsfva/results.md)  
+**What will GAIA accomplish?**
+- Enable a GCM to accurately model local convection and predict self-organizing atmospheric wave phenomena 
+- Exploit this GCM to explore possible future regimes and identify early warning signatures for MJO-related tipping points.
+  
 
-[,](index_dev.md)
+**Progress**
+- Developed and validated high-skill AI surrogates for multiple GCM local models, including CAM4, SPCAM with Morrison micro-physics, SPCAM with CLUBB cloud parameterization
+- Currently studying impact of added memory and ablating inputs
+- Next Steps: 
+  - Determine input regimes where CAM/SPCAM underperform
+  - Analyze GCM sensitivity using lower order dynamical model 
+  - Apply results to selectively enhance local surrogate using ultra-high-resolution local eddy simulation for training. 
+  - Integrate surrogate into GCM; use GCM to test MJO hypotheses
+
+
+## Milestone Reports
+
+- [Milestone Report 1](milestone_reports/milestone_report_1.pdf)
+- [Milestone Report 2](milestone_reports/milestone_report_2.pdf)
+

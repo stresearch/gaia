@@ -12,8 +12,8 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 ## Sections
 - [Datasets](sections/datasets/README.md) - description of datasets used in surrogate training
 - [Surrogate Details and Hyperparameter Sweeps](sections/baseline_hparams/README.md) - neural network architecture and hyperparameter comparison
-- [Comparison of Surrogates Trained on Different Datasets](sections/surrogate_comparison/README.md) - compare surrugates to CAM4, SPCAM simulations and compare CAM4 and SPCAM4 trained surrogates to each other
-- [Baseline Input Ablation](sections/baseline_input_ablation/README.md) - ablation of input variables and their effect of model performance
+- [Comparison of Surrogates Trained on Different Datasets](sections/surrogate_comparison/README.md) - compare surrogates to CAM4, SPCAM simulations and compare CAM4 and SPCAM4 trained surrogates to each other
+- [Baseline Input Ablation](sections/baseline_input_ablation/README.md) - ablation of input variables and their effect on model performance
 - [Surrogate with Memory Inputs](sections/memory/README.md) - improving surrogate performance by adding memory i.e. outputs from previous timestep
 - [Integration of AI Surrogate into GCM](sections/gcm_integration/README.md) - deploying GAIA ML model in the GCM
 - [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets

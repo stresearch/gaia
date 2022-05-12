@@ -1,4 +1,4 @@
-# Comparison of Surrugate Models <!-- omit in toc -->
+# Comparison of Surrogate Models <!-- omit in toc -->
 
 - [Summary](#summary)
 - [CAM4 Simulation vs CAM4-trained Neural Network](#cam4-simulation-vs-cam4-trained-neural-network)

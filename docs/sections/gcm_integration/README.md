@@ -55,3 +55,39 @@ int main(int argc, const char* argv[]) {
 }
 
 ```
+## Plans
+1. Naive Model
+    - Input and output spaces matched with the surrogate model 
+    - Model should output tendencies from an arbitrary time-step in CAM4 data
+    - Written in Pytorch and output as Torchscript
+2. Create a new package for CAM4 Physics 
+    - Ensure that the input and output of this package matches the surrogate model input/output
+    - Ensure that the input and output of this package covers all of CAM4 physics
+    - Create a shared object to be loaded by the new package (shared object using C++)
+3. Run CAM4 hybrid
+    - Run CAM4 with the new package but with no updates to tendencies (just to see that it does not crash)
+    - Run CAM4 mixing old and new added model
+    - Turn CAM4 parametrisations gradually testing that the model can work only with the new hybrid package
+    - Replace Naive model with AI surrogate once ready
+4. LES Runs
+    - Use boundary conditions from CAM4 (CAM4 VTable) to feed to WRF
+    - Write a converter taking WRF outputs and converting to CESM/CAM4 formats 
+    - Re-train the AI surrogate model and export using Torchscript
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

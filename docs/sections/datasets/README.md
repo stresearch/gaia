@@ -27,6 +27,7 @@
 - 3 hourly Boundary Conditions by SPCAM runs + nudging of state variables
 - History outputs at 10 minutes (horizontally averaged and mapped to same vertical grid as CAM4)
 
+[![](GCM_LES.png)](GCM_LES.png)
 
 ## Approach
 - Develop an AI surrogate to parametric atmospheric physics models used by a GCM at sub-grid scales

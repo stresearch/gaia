@@ -5,6 +5,15 @@ Refer to our deployment repo https://github.com/stresearch/gaia-deploy
 ## Strategy
 [![](GCM_integration.png)](GCM_integration.png)
 
+## Application Binary Interface (ABI) Development
+- Start with total T,Q physics tendencies and track them back
+- Check all the tendency updates from all processes
+- Verify all inputs and outputs that are needed with all the tendency updates
+- Find out where we want to intercept the variables
+- Export Pytorch Model with Torchscript
+- Bypass Python by using C++
+- Call C++ within Fortran
+
 ## Exporting Pytorch Model
 
 We export pytorch surrogate model to a torchscript format. This enables us to load a checkpoint with C++.

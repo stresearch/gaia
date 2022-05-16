@@ -2,6 +2,9 @@
 
 Refer to our deployment repo https://github.com/stresearch/gaia-deploy
 
+## Strategy
+[![](GCM_integration.png)](GCM_integration.png)
+
 ## Exporting Pytorch Model
 
 We export pytorch surrogate model to a torchscript format. This enables us to load a checkpoint with C++.

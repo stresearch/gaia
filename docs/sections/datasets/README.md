@@ -29,9 +29,11 @@
 
 [![](GCM_LES.png)](GCM_LES.png)
 
-## Approach
-- Develop an AI surrogate to parametric atmospheric physics models used by a GCM at sub-grid scales
-- Refine the surrogate using a fine-grid (200m) LES model, focusing on environmental regimes relevant to the MJO and "super-MJO" tipping points
-- Novel memory feauture helps the surrogate capture persistent local convection phenomena
-- Embed into a GCM to produce a multi-scale AI hybrid model that for the first time accurately captures MJO-relevant convection aggregation at all scales > 200m
-- Exploit manifold learning to characterize MJO tipping points and signatures, refining the surrogate as needed
+## Evaluations
+All the simulations have been evaluated zonally for Precipitation and Outgoing Longwave Radiation (OLR) using satellite observations.
+
+[![](pr_comp.png)](pr_comp.png)
+Zonal distribution of precipitation using model runs (solid lines) and satellite observations (dashed lines).
+
+[![](olr_comp.png)](olr_comp.png)
+Zonal distribution of Outgoing Longwave Radiation (OLR) using model runs (solid lines) and satellite observations (dashed lines).

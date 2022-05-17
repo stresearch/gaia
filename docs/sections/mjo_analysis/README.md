@@ -9,29 +9,29 @@ MJO is an eastward moving disturbance of clouds, rainfall, winds, and pressure t
 MJO can be characterised using [wavelength-frequency analysis](https://journals.ametsoc.org/view/journals/atsc/56/3/1520-0469_1999_056_0374_ccewao_2.0.co_2.xml) of vaiables such as the [outgoing longwave radiation](https://psl.noaa.gov/data/gridded/data.interp_OLR.html).
 
 ### Symmetric
-**OBS**                    |  **CAM4**
-:-------------------------:|:-------------------------:
-![](sym.obs.png)           |  ![](sym.cam4.png)
-**SPCAM**                  |  **SPCAM+CLUBB**
-![](sym.spcam.png)         |  ![](sym.spcam.clubb.png)
+**OBS**                                           |  **CAM4**
+:------------------------------------------------:|:-------------------------------------------------------:
+<img src="sym.obs.png" width="400" height="400">  | <img src="sym.cam4.png" width="400" height="400">
+**SPCAM**                                         |  **SPCAM+CLUBB**
+<img src="sym.spcam.png" width="400" height="400">| <img src="sym.spcam.clubb.png" width="400" height="400">
 
 ### Anti-Symmetric
-**OBS**                    |  **CAM4**
-:-------------------------:|:-------------------------:
-![](asym.obs.png)          |  ![](asym.cam4.png)
-**SPCAM**                  |  **SPCAM+CLUBB**
-![](asym.spcam.png)        |  ![](asym.spcam.clubb.png)
+**OBS**                                            |  **CAM4**
+:-------------------------------------------------:|:-------------------------------------------------------:
+<img src="asym.obs.png" width="400" height="400">  | <img src="asym.cam4.png" width="400" height="400">
+**SPCAM**                                          |  **SPCAM+CLUBB**
+<img src="asym.spcam.png" width="400" height="400">| <img src="asym.spcam.clubb.png" width="400" height="400">
 
 ### Summer
-**OBS**                    |  **CAM4**
-:-------------------------:|:-------------------------:
-![](summer.obs.png)          |  ![](summer.cam4.png)
-**SPCAM**                  |  **SPCAM+CLUBB**
-![](summer.spcam.png)        |  ![](summer.spcam.clubb.png)
+**OBS**                                              |  **CAM4**
+:---------------------------------------------------:|:-------------------------------------------------------:
+<img src="summer.obs.png" width="400" height="400">  | <img src="summer.cam4.png" width="400" height="400">
+**SPCAM**                                            |  **SPCAM+CLUBB**
+<img src="summer.spcam.png" width="400" height="400">| <img src="summer.spcam.clubb.png" width="400" height="400">
 
 ### Winter
-**OBS**                    |  **CAM4**
-:-------------------------:|:-------------------------:
-![](winter.obs.png)          |  ![](winter.cam4.png)
-**SPCAM**                  |  **SPCAM+CLUBB**
-![](winter.spcam.png)        |  ![](winter.spcam.clubb.png)
+**OBS**                                              |  **CAM4**
+:---------------------------------------------------:|:-------------------------------------------------------:
+<img src="winter.obs.png" width="400" height="400">  | <img src="winter.cam4.png" width="400" height="400">
+**SPCAM**                                            |  **SPCAM+CLUBB**
+<img src="winter.spcam.png" width="400" height="400">| <img src="winter.spcam.clubb.png" width="400" height="400">

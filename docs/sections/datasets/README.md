@@ -1,10 +1,13 @@
 # Datasets
+
+[![](GCM_LES.png)](GCM_LES.png)
+
 ## GCM
 - [Community Atmospheric Model (CAM4)](https://www.cesm.ucar.edu/models/ccsm4.0/cam/)
 - 30 minute time-step
 - 2.5-degree grid (144x96)
 - 30 levels
-- One year debug run (1979 SST; Time Varying) been extended to four than ten years.
+- Four year run (1979 SST; Time Varying) which will be extended to ten years.
 - Outputs every 3 hours + additional model time-step (memory)
 
 ## CRM
@@ -27,13 +30,31 @@
 - 3 hourly Boundary Conditions by SPCAM runs + nudging of state variables
 - History outputs at 10 minutes (horizontally averaged and mapped to same vertical grid as CAM4)
 
-[![](GCM_LES.png)](GCM_LES.png)
+## Output Variables
+  -	Total (convective and large-scale) precipitation rate (liq + ice), PRECT
+  -	Convective precipitation rate (liq + ice), PRECC
+  -	Q total physics tendency, PTEQ
+  -	T total physics tendency, PTTEND
+  -	Specific humidity, Q
+  -	Temperature, T
+  -	Zonal wind, U
+  -	Meridional wind, V
+  -	Vertical velocity, OMEGA
+  -	Sea Level Pressure, SLP
+  -	Solar Insolation, SOLIN
+  -	Sensible Heat Flux, SHFLX
+  -	Surface Latent Heat Flux, LHFLX
+  -	Net Solar Flux at Surface, FSNS
+  -	Net Longwave Flux at Surface, FLNS
+  -	Net Solar Flux at the Top of Model, FSNT
+  -	Net Longwave Flux at the Top of Model, FLNT
+
 
 ## Evaluations
 All the simulations have been evaluated zonally for Precipitation and Outgoing Longwave Radiation (OLR) using satellite observations.
 
 [![](pr_comp.png)](pr_comp.png)
-Zonal distribution of precipitation using model runs (solid lines) and satellite observations (dashed lines).
+*Zonal distribution of precipitation using model runs (solid lines) and satellite observations (dashed lines).*
 
 [![](olr_comp.png)](olr_comp.png)
-Zonal distribution of Outgoing Longwave Radiation (OLR) using model runs (solid lines) and satellite observations (dashed lines).
+*Zonal distribution of Outgoing Longwave Radiation (OLR) using model runs (solid lines) and satellite observations (dashed lines).*

@@ -1,6 +1,6 @@
 # GCM Integration
 
-Refer to our deployment repo https://github.com/stresearch/gaia-deploy
+Refer to our [deployment repo](https://github.com/stresearch/gaia-deploy).
 
 ## Strategy
 [![](GCM_integration.png)](GCM_integration.png)

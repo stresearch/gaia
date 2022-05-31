@@ -77,6 +77,7 @@ def run():
             "hidden_size": args.hidden_size,
             #   "num_output_layers": 6
         }
+
     elif args.model_type == "conv1d":
         model_config = {
             "model_type": "conv1d",
@@ -84,6 +85,14 @@ def run():
             "hidden_size": 128,
             #   "num_output_layers": 6
         }
+    elif args.model_type == "resdnn":
+        model_config = {
+                "model_type": "resdnn",
+                "num_layers": args.num_layers,
+                "hidden_size": args.hidden_size,
+                "dropout": args.dropout
+                #   "num_output_layers": 6
+            }
     else:
         raise ValueError
 

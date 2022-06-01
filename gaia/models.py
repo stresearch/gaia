@@ -7,7 +7,7 @@ from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
 from gaia.data import SCALING_FACTORS
-from gaia.layers import InterpolateGrid1D, Normalization, make_interpolation_weights
+from gaia.layers import InterpolateGrid1D, Normalization, ResDNNLayer, make_interpolation_weights
 import os
 import torch_optimizer
 from gaia.unet.unet import UNet
@@ -75,6 +75,8 @@ class TrainingModel(LightningModule):
             self.model = ConvNet1D(
                 input_index=input_index, output_index=output_index, **model_config
             )
+        elif model_type == "resdnn":
+            self.model = ResDNN(**model_config)
         else:
             raise ValueError("unknown model_type")
 
@@ -376,6 +378,55 @@ class FcnBaseline(torch.nn.Module):
     def forward(self, x):
         return self.model(x)
 
+
+
+
+
+class ResDNN(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        model_type=None,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.model = self.make_model()
+
+    def make_model(self):
+        if self.num_layers == 1:
+            return torch.nn.Linear(self.input_size, self.output_size)
+
+        def make_layer(ins, outs):
+            layer = torch.nn.Sequential(
+                torch.nn.Linear(ins, outs),
+                # torch.nn.BatchNorm1d(outs),
+                # torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+
+            return layer
+
+        input_layer = make_layer(self.input_size, self.hidden_size)
+        intermediate_layers = [
+            ResDNNLayer(self.hidden_size, self.leaky_relu, self.dropout)
+            for _ in range(self.num_layers - 2)
+        ]
+        output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+        layers = [input_layer] + intermediate_layers + [output_layer]
+        return torch.nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
 
 class FcnHistory(torch.nn.Module):
     def __init__(

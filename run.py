@@ -29,7 +29,8 @@ dataset_names = {
     "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
 }
 
-mean_thres_defaults = {"cam4" : 1e-13, "spcam": 1e-15}
+mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
+
 
 def run():
     parser = argparse.ArgumentParser()
@@ -48,16 +49,16 @@ def run():
     parser.add_argument("--hidden_size", default=512, type=int)
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--num_layers", default=7, type=int)
-    parser.add_argument("--batch_size", default=10 * 96 * 144, type=int)
+    parser.add_argument("--batch_size", default=24 * 96 * 144, type=int)
     parser.add_argument("--dropout", default=0.01, type=float)
     parser.add_argument("--mean_thres", default=None, type=float)
     parser.add_argument("--max_epochs", default=200, type=int)
+    parser.add_argument("--leaky_relu", default=0.15, type=float)
 
     args = parser.parse_args()
 
-    mean_thres_defaults = {"cam4" : 1e-13, "spcam": 1e-15}
+    mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
     args.mean_thres = mean_thres_defaults[args.dataset]
-
 
     args.dataset = dataset_names[args.dataset]
 
@@ -67,7 +68,8 @@ def run():
             "model_type": "fcn",
             "num_layers": args.num_layers,
             "hidden_size": args.hidden_size,
-            "dropout": args.dropout
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu
             #   "num_output_layers": 6
         }
     elif args.model_type == "memory":
@@ -75,13 +77,25 @@ def run():
             "model_type": "fcn_history",
             "num_layers": args.num_layers,
             "hidden_size": args.hidden_size,
+            "leaky_relu": args.leaky_relu
             #   "num_output_layers": 6
         }
+
     elif args.model_type == "conv1d":
         model_config = {
             "model_type": "conv1d",
             "num_layers": 7,
             "hidden_size": 128,
+            #   "num_output_layers": 6
+        }
+
+    elif args.model_type == "resdnn":
+        model_config = {
+            "model_type": "resdnn",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu
             #   "num_output_layers": 6
         }
     else:

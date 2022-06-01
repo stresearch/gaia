@@ -1,5 +1,6 @@
 from asyncio.log import logger
 from collections import OrderedDict
+from math import ceil
 from turtle import forward
 from typing import List
 from cv2 import normalize
@@ -77,6 +78,8 @@ class TrainingModel(LightningModule):
             )
         elif model_type == "resdnn":
             self.model = ResDNN(**model_config)
+        elif model_type == "encoderdecoder":
+            self.model = EncoderDecoder(**model_config)
         else:
             raise ValueError("unknown model_type")
 
@@ -378,6 +381,54 @@ class FcnBaseline(torch.nn.Module):
     def forward(self, x):
         return self.model(x)
 
+
+class EncoderDecoder(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        bottleneck_dim: int = 32, 
+        model_type=None,
+    ):
+        super().__init__()
+
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.bottleneck_dim = bottleneck_dim
+
+        encoder_layers = ceil(self.num_layers/2)
+        decoder_layers = self.num_layers - encoder_layers
+
+        self.encoder = FcnBaseline(hidden_size = hidden_size,
+                                    num_layers = encoder_layers,
+                                   input_size  = input_size,
+                                   output_size = bottleneck_dim,
+                                   dropout = dropout,
+                                   leaky_relu=leaky_relu)
+
+        self.decoder = FcnBaseline(hidden_size = hidden_size,
+                                    num_layers = decoder_layers,
+                                   input_size  = bottleneck_dim,
+                                   output_size = output_size,
+                                   dropout = dropout,
+                                   leaky_relu=leaky_relu)
+
+
+    def forward(self,x, return_bottleneck = False):
+        b = self.encoder(x)
+        y = self.decoder(b)
+        if return_bottleneck:
+            return y,b
+        else:
+            return y
 
 
 

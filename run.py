@@ -54,6 +54,7 @@ def run():
     parser.add_argument("--mean_thres", default=None, type=float)
     parser.add_argument("--max_epochs", default=200, type=int)
     parser.add_argument("--leaky_relu", default=0.15, type=float)
+    parser.add_argument("--bottleneck", default=32, type = int)
 
     args = parser.parse_args()
 
@@ -96,6 +97,16 @@ def run():
             "hidden_size": args.hidden_size,
             "dropout": args.dropout,
             "leaky_relu": args.leaky_relu
+            #   "num_output_layers": 6
+        }
+    elif args.model_type == "encoderdecoder":
+        model_config = {
+            "model_type": "encoderdecoder",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu,
+            "bottleneck_dim": args.bottleneck,
             #   "num_output_layers": 6
         }
     else:

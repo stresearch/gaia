@@ -1,6 +1,9 @@
 
-python run.py --mode "train,val,test" --gpu 2 --model_type resdnn --batch_size 1024 --dataset cam4 --hidden_size 512 --leaky_relu 0 &
-python run.py --mode "train,val,test" --gpu 2 --model_type resdnn --batch_size 1024 --dataset spcam --hidden_size 512 --leaky_relu 0 &
+# batch_size=$((2*96*144))
+
+
+python run.py --mode "train,val,test" --gpu 3 --model_type encoderdecoder --dataset cam4 --bottleneck 4
+# python run.py --mode "train,val,test" --gpu 2 --model_type encoderdecoder --dataset cam4 --bottleneck 16
 
 
 # python run.py --mode "train,val,test" --gpu 0 --batch_size $batch_size

@@ -74,14 +74,14 @@ class ResDNNLayer(torch.nn.Module):
 
         self.layer1 = torch.nn.Sequential(
             torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.BatchNorm1d(hidden_dim),
-            torch.nn.Dropout(dropout),
+            # torch.nn.BatchNorm1d(hidden_dim),
+            # torch.nn.Dropout(dropout),
             torch.nn.LeakyReLU(leaky_relu),
         )
         self.layer2 = torch.nn.Sequential(
             torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.BatchNorm1d(hidden_dim),
-            torch.nn.Dropout(dropout),
+            # torch.nn.BatchNorm1d(hidden_dim),
+            # torch.nn.Dropout(dropout),
             torch.nn.LeakyReLU(leaky_relu),
         )
 

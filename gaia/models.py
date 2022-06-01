@@ -409,8 +409,8 @@ class ResDNN(torch.nn.Module):
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
                 torch.nn.Linear(ins, outs),
-                torch.nn.BatchNorm1d(outs),
-                torch.nn.Dropout(self.dropout),
+                # torch.nn.BatchNorm1d(outs),
+                # torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
             )
 

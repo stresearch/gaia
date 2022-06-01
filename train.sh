@@ -1,10 +1,19 @@
+
+python run.py --mode "train,val,test" --gpu 2 --model_type resdnn --batch_size 1024 --dataset cam4 --hidden_size 512 --leaky_relu 0 &
+python run.py --mode "train,val,test" --gpu 2 --model_type resdnn --batch_size 1024 --dataset spcam --hidden_size 512 --leaky_relu 0 &
+
+
+# python run.py --mode "train,val,test" --gpu 0 --batch_size $batch_size
+
+
+
 # "Q,T,U,V,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3"
 # Q,T,SHFLX,OMEGA
 
 
 
 
-# batch_size=$((24*96*144))
+
 
 
 
@@ -20,8 +29,8 @@
 # batch_size=$((2*96*144))
 # thres="1e-13"
 
-python run.py --mode "results" --ckpt lightning_logs_compare_models/spcam_nn
-python run.py --mode "results" --ckpt lightning_logs_compare_models/cam4_nn
+# python run.py --mode "results" --ckpt lightning_logs_compare_models/spcam_nn
+# python run.py --mode "results" --ckpt lightning_logs_compare_models/cam4_nn
 
 
 # python run.py --mode "train,val,test" --ckpt $ckpt --num_layers 28 --hidden_size 2048 --gpu 4 --mean_thres $thres --batch_size $batch_size --max_epochs 1000

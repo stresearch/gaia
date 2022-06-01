@@ -58,6 +58,7 @@ def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-1
     )
 
     if mean_thres > 0:
+        ### ignore outputs with very small numbers
         ignore_outputs = (
             dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
         )
@@ -325,6 +326,8 @@ def main(
                 logger=False,
                 **trainer_params,
             )
+
+
 
         validation_score = trainer.validate(model, val_dataloader)
         json.dump(

@@ -513,14 +513,17 @@ class NCDataConstructor:
             # lets make dedicated train and val so that we dont have to worry about it anymore
             x = out.pop("x")
             y = out.pop("y")
+            index = out.pop("index")
 
             mask = torch.rand(x.shape[0]) > 0.1  # .9 train
 
             xtrain = x[mask, ...]
             ytrain = y[mask, ...]
+            index_train = index[mask]
 
             out["x"] = xtrain
             out["y"] = ytrain
+            out["index"] = index_train
 
             torch.save(
                 out,
@@ -532,9 +535,11 @@ class NCDataConstructor:
 
             xval = x[~mask, ...]
             yval = y[~mask, ...]
+            index_val = index[~mask]
 
             out["x"] = xval
             out["y"] = yval
+            out["index"] = index_val
 
             torch.save(
                 out,

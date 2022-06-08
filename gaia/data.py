@@ -494,6 +494,7 @@ class NCDataConstructor:
             ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
             flatten=split == "train",
+            shuffle = split == "train",
             subsample_factor=4,
             compute_stats=True,
             cache = os.path.join(cache,split),
@@ -689,7 +690,11 @@ class NCDataConstructor:
     def subsample_data(self, xi, yi, subsample_factor):
         size = xi.shape[0]
         new_size = size // subsample_factor
-        shuffled_index = torch.randperm(size)[:new_size]
+        if self.shuffle:
+            shuffled_index = torch.randperm(size)[:new_size]
+        else:
+            shuffled_index = torch.arange(0, size, subsample_factor)
+
         xi = xi[shuffled_index, ...]
         yi = yi[shuffled_index, ...]
         return xi, yi, shuffled_index

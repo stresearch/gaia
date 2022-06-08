@@ -374,7 +374,7 @@ def main(
         model = TrainingModel.load_from_checkpoint(
             get_checkpoint_file(model_dir),
             strict=False,
-            **{"interpolate": interpolation_params},
+            **{"interpolate": interpolation_params, "predict_hidden_states" : False},
         )
 
         ### loading a different dataset

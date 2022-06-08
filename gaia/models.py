@@ -30,6 +30,7 @@ class TrainingModel(LightningModule):
         memory_variables=None,
         ignore_input_variables=None,
         interpolate=None,
+        predict_hidden_states = False,
         **kwargs,
     ):
         super().__init__()
@@ -327,13 +328,18 @@ class TrainingModel(LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         x, y = self.handle_batch(batch)
-        yhat = self(x)
-        yhat = self.output_normalize(yhat, normalize=False)  # denormalize
 
-        if self.hparams.interpolate is not None:
-            yhat = self.interpolate_model_to_data_output(yhat)
+        if self.hparams.predict_hidden_states:
+            y,h = self.model(x, return_hidden_state = True)
+            return h.cpu()
+        else:
+            yhat = self(x)
+            yhat = self.output_normalize(yhat, normalize=False)  # denormalize
+
+            if self.hparams.interpolate is not None:
+                yhat = self.interpolate_model_to_data_output(yhat)
         
-        return yhat.cpu()
+            return yhat.cpu()
 
 
 class FcnBaseline(torch.nn.Module):
@@ -422,10 +428,10 @@ class EncoderDecoder(torch.nn.Module):
                                    leaky_relu=leaky_relu)
 
 
-    def forward(self,x, return_bottleneck = False):
+    def forward(self,x, return_hidden_state = False):
         b = self.encoder(x)
         y = self.decoder(b)
-        if return_bottleneck:
+        if return_hidden_state:
             return y,b
         else:
             return y

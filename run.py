@@ -1,4 +1,4 @@
-
+import argparse
 import os
 
 # os.environ["CUDA_LAUNCH_BLOCKING"]="1"
@@ -6,18 +6,12 @@ import glob
 import numpy as np
 from gaia.evaluate import process_results
 from gaia import get_logger
+import yaml
+
+# from argparse import
 
 logger = get_logger(__name__)
 
-# files_or_pattern = glob.glob("/proj/gaia-climate/data/cesm106_cam4/*.nc")[:1]
-
-
-# dataset = NcDatasetMem(files_or_pattern)
-
-# ins, outs = dataset[100]
-
-# print(ins)
-# print(outs)
 
 from gaia.training import (
     main,
@@ -28,49 +22,119 @@ from gaia.training import (
 
 from gaia.plot import plot_results
 
+# "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4"
+
+dataset_names = {
+    "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
+    "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
+}
+
+mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
 
 
+def run():
+    parser = argparse.ArgumentParser()
 
-model_config={
-              "model_type": "unet",
-              "num_layers": 7,
+    parser.add_argument("--ignore_input_variables", default=None, type=str)
+    parser.add_argument("--memory_variables", default=None, type=str)
+    parser.add_argument(
+        "--dataset",
+        default="cam4",
+        type=str,
+    )
+    parser.add_argument("--gpu", default=1, type=int)
+    parser.add_argument("--model_type", default="baseline", type=str)
+    parser.add_argument("--mode", default="train", type=str)
+    parser.add_argument("--ckpt", default=None, type=str)
+    parser.add_argument("--hidden_size", default=512, type=int)
+    parser.add_argument("--lr", default=0.001, type=float)
+    parser.add_argument("--num_layers", default=7, type=int)
+    parser.add_argument("--batch_size", default=24 * 96 * 144, type=int)
+    parser.add_argument("--dropout", default=0.01, type=float)
+    parser.add_argument("--mean_thres", default=None, type=float)
+    parser.add_argument("--max_epochs", default=200, type=int)
+    parser.add_argument("--leaky_relu", default=0.15, type=float)
+    parser.add_argument("--bottleneck", default=32, type = int)
+
+    args = parser.parse_args()
+
+    mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
+    args.mean_thres = mean_thres_defaults[args.dataset]
+
+    args.dataset = dataset_names[args.dataset]
+
+    if args.model_type == "baseline":
+
+        model_config = {
+            "model_type": "fcn",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu
             #   "num_output_layers": 6
-             }
+        }
+    elif args.model_type == "memory":
+        model_config = {
+            "model_type": "fcn_history",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "leaky_relu": args.leaky_relu
+            #   "num_output_layers": 6
+        }
+
+    elif args.model_type == "conv1d":
+        model_config = {
+            "model_type": "conv1d",
+            "num_layers": 7,
+            "hidden_size": 128,
+            #   "num_output_layers": 6
+        }
+
+    elif args.model_type == "resdnn":
+        model_config = {
+            "model_type": "resdnn",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu
+            #   "num_output_layers": 6
+        }
+    elif args.model_type == "encoderdecoder":
+        model_config = {
+            "model_type": "encoderdecoder",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+            "dropout": args.dropout,
+            "leaky_relu": args.leaky_relu,
+            "bottleneck_dim": args.bottleneck,
+            #   "num_output_layers": 6
+        }
+    else:
+        raise ValueError
+
+    main(
+        args.mode,
+        trainer_params=default_trainer_params(
+            gpus=[args.gpu], precision=16, max_epochs=args.max_epochs
+        ),
+        dataset_params=default_dataset_params(
+            base=args.dataset, batch_size=args.batch_size, mean_thres=args.mean_thres
+        ),
+        model_params=default_model_params(
+            memory_variables=args.memory_variables.split(",")
+            if args.memory_variables
+            else None,
+            ignore_input_variables=args.ignore_input_variables.split(",")
+            if args.ignore_input_variables
+            else None,
+            lr=args.lr,
+            use_output_scaling=False,
+            replace_std_with_range=False,
+            model_config=model_config,
+            ckpt=args.ckpt,
+        ),
+    )
 
 
-
-main("train", trainer_params = default_trainer_params(gpus=[7],precision=16),
-              dataset_params = default_dataset_params(batch_size=1024),
-              model_params = default_model_params(lr = 1e-3, use_output_scaling=False, replace_std_with_range = False, model_config = model_config))
-
-
-
-# for i in [0,1,2,3,4]:
-#     model_dir = f"/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_{i}"
-
-
-#     if not os.path.exists(os.path.join(model_dir, "predictions.pt")):
-#         logger.info(f"predicting {model_dir}")
-#         main("predict", trainer_params = default_trainer_params(gpus=[1],precision=16),
-#                     dataset_params = default_dataset_params(),
-#                     model_params =   default_model_params(ckpt =model_dir))
-
-#     if not os.path.exists(os.path.join(model_dir, "results.pt")):
-#         logger.info(f"processing results {model_dir}")
-#         process_results(model_dir)
-
-# process_results("/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs/version_0")#, naive_memory = True)
-
-# predict(gpus=[3])
-# import shutil
-
-
-
-# for v in [0]:
-#     plot_results(f"lightning_logs/version_{v}")
-#     if v == 0:
-#         shutil.copy(f"lightning_logs/version_{v}/plots_naive.html", "docs/results/spcam/plots_naive.html")
-#     elif v == 1:
-#         shutil.copy(f"lightning_logs/version_{v}/plots.html", "docs/results/spcam/plots_baseline.html")
-#     # elif v == 2:
-#     #     shutil.copy(f"lightning_logs/version_{v}/plot.html", "docs/results/spcam/plots_naive.html")
+if __name__ == "__main__":
+    run()

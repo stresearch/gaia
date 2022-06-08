@@ -294,11 +294,57 @@ levels = [
     992.556095123291,
 ]
 
+levels26 = [
+    3.5446380000000097,
+    7.3888135000000075,
+    13.967214000000006,
+    23.944625,
+    37.23029000000011,
+    53.1146050000002,
+    70.05915000000029,
+    85.43911500000031,
+    100.51469500000029,
+    118.25033500000026,
+    139.11539500000046,
+    163.66207000000043,
+    192.53993500000033,
+    226.51326500000036,
+    266.4811550000001,
+    313.5012650000006,
+    368.81798000000157,
+    433.8952250000011,
+    510.45525500000167,
+    600.5242000000027,
+    696.7962900000033,
+    787.7020600000026,
+    867.1607600000013,
+    929.6488750000024,
+    970.5548300000014,
+    992.5560999999998,
+]
+
+
+def get_land_polies():
+    polys = [
+        np.array(p[0])
+        for p in pd.read_json(LAND_FILE)["features"].apply(
+            lambda a: a["geometry"]["coordinates"]
+        )
+    ]
+
+    return polys
 
 def get_land_outline():
-    polys = [np.array(p[0]) for p in pd.read_json(LAND_FILE)["features"].apply(lambda a: a["geometry"]["coordinates"])]
-    polys = [dict(lat = p[:,1], lon = p[:,0]) for p in polys] 
-    return hv.Polygons(polys,kdims = ["lon","lat"]).opts(fill_color=None, line_color="orange")
+    polys = [
+        np.array(p[0])
+        for p in pd.read_json(LAND_FILE)["features"].apply(
+            lambda a: a["geometry"]["coordinates"]
+        )
+    ]
+    polys = [dict(lat=p[:, 1], lon=p[:, 0]) for p in polys]
+    return hv.Polygons(polys, kdims=["lon", "lat"]).opts(
+        fill_color=None, line_color="orange"
+    )
 
 
 def plot_skill_at_levels(y, yhat, lats, levels, var_name=""):
@@ -312,7 +358,12 @@ def plot_skill_at_levels(y, yhat, lats, levels, var_name=""):
     width = height = 500
 
     opts = dict(
-        colorbar=True, width=width, height=height,axiswise=True, invert_yaxis=True, tools=["hover"]
+        colorbar=True,
+        width=width,
+        height=height,
+        axiswise=True,
+        invert_yaxis=True,
+        tools=["hover"],
     )
 
     skill_plot = (
@@ -330,13 +381,13 @@ def plot_skill_at_levels(y, yhat, lats, levels, var_name=""):
         kdims=["lat", "level"],
         vdims=["mse"],
         label=f"mse(y,yhat): {var_name}",
-    ).opts(cmap="reds",  **opts)
+    ).opts(cmap="reds", **opts)
     std_plot = hv.Image(
         (lats, levels, y_var),
         kdims=["lat", "level"],
         vdims=["var"],
         label=f"var(y): {var_name}",
-    ).opts(cmap="greens",  **opts)
+    ).opts(cmap="greens", **opts)
 
     return skill_plot + rmse_plot + std_plot
 
@@ -351,7 +402,9 @@ def plot_skill_scalar(y, yhat, lats, var_name=""):
 
     width = height = 500
 
-    opts = dict(width=width, height=height, axiswise=True,  line_width=2, tools=["hover"])
+    opts = dict(
+        width=width, height=height, axiswise=True, line_width=2, tools=["hover"]
+    )
 
     skill_plot = (
         hv.Curve(
@@ -374,15 +427,15 @@ def plot_skill_scalar(y, yhat, lats, var_name=""):
 
 
 def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
-    
-    #make it so we can use land outlines
-    lons = np.array(lons)  
-    lons[lons>180] = lons[lons>180]-360
+
+    # make it so we can use land outlines
+    lons = np.array(lons)
+    lons[lons > 180] = lons[lons > 180] - 360
     new_index = lons.argsort()
     lons = lons[new_index]
-    
-    y = y[:,:,:,new_index]
-    yhat = yhat[:,:,:,new_index]
+
+    y = y[:, :, :, new_index]
+    yhat = yhat[:, :, :, new_index]
 
     reduce_dims = [0, 1]
     y_var = y.var(reduce_dims, unbiased=False)
@@ -391,18 +444,16 @@ def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
     # rmse = mse.sqrt()
     # std = y_var.sqrt()
 
-    
-
     width = height = 500
 
     opts = dict(
-        colorbar=True, width=width, height=height, axiswise=True,tools=["hover"]
+        colorbar=True, width=width, height=height, axiswise=True, tools=["hover"]
     )
 
     skill_plot = (
         hv.Image(
             (lons, lats, skill),
-            kdims=["lon","lat"],
+            kdims=["lon", "lat"],
             vdims=["skill"],
             label=f"skill(y,yhat): {var_name}",
         )
@@ -411,20 +462,21 @@ def plot_skill_scalar_world(y, yhat, lons, lats, var_name=""):
     )
     rmse_plot = hv.Image(
         (lons, lats, mse),
-        kdims=["lon","lat"],
+        kdims=["lon", "lat"],
         vdims=["mse"],
         label=f"mse(y,yhat): {var_name}",
-    ).opts(cmap="reds",  **opts)
+    ).opts(cmap="reds", **opts)
     std_plot = hv.Image(
         (lons, lats, y_var),
-        kdims=["lon","lat"],
+        kdims=["lon", "lat"],
         vdims=["var"],
         label=f"var(y): {var_name}",
-    ).opts(cmap="greens",  **opts)
+    ).opts(cmap="greens", **opts)
 
     outline = get_land_outline()
 
-    return skill_plot*outline + rmse_plot + std_plot
+    return skill_plot * outline + rmse_plot + std_plot
+
 
 def plot_results(model_dir):
 
@@ -460,3 +512,7 @@ def plot_results(model_dir):
         + [("params", params)]
     )
     combined_plot.save(os.path.join(model_dir, "plots_naive.html"))
+
+
+
+

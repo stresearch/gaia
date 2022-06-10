@@ -20,6 +20,7 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 - [Surrogate with Memory Inputs](sections/memory/README.md) - improving surrogate performance by adding memory i.e. outputs from previous timestep
 - [Integration of AI Surrogate into GCM](sections/gcm_integration/README.md) - deploying GAIA ML model in the GCM
 - [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets
+- [Surrogate Bottleneck Analysis](sections/bottleneck/README.md) - analysis of bottleneck dimension of the surrogate model
 
 
 ## Overview

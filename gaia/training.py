@@ -23,6 +23,8 @@ from gaia.plot import levels26, levels
 import yaml
 
 from gaia import get_logger
+# from gaia.config import Config
+from gaia.config import Config
 
 logger = get_logger(__name__)
 
@@ -125,7 +127,7 @@ def default_dataset_params(
     base="/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
     mean_thres=1e-13,
 ):
-
+    raise DeprecationWarning
     var_index_file = base + "_var_index.pt"
 
     return dict(
@@ -207,6 +209,7 @@ def default_dataset_params_v1(
 
 
 def default_model_params(**kwargs):
+    raise DeprecationWarning
     d = dict(
         lr=1e-3,
         optimizer="adam",
@@ -229,6 +232,7 @@ def load_hparams_file(model_dir):
 
 
 def default_trainer_params(**kwargs):
+    raise DeprecationWarning
     d = dict(precision=16,max_epochs=200)
     d.update(kwargs)
     return d
@@ -245,11 +249,11 @@ def make_pretty_for_log(d, max_char=100):
 
 def main(
     mode="train",
-    trainer_params=default_trainer_params(),
-    dataset_params=default_dataset_params(),
-    model_params=default_model_params(),
-    seed=None,
-    interpolation_params = None
+    trainer_params=Config().trainer_params,
+    dataset_params=Config().dataset_params,
+    model_params=Config().model_params,
+    seed=Config().seed,
+    interpolation_params = Config().interpolation_params
 ):
     if seed:
         logger.info("seeding everything")
@@ -259,8 +263,6 @@ def main(
     logger.info(f"trainer_params: \n{make_pretty_for_log(trainer_params)}")
     logger.info(f"dataset_params: \n{make_pretty_for_log(dataset_params)}")
     logger.info(f"model_params: \n{make_pretty_for_log(model_params)}")
-
-    mode = mode.split(",")
 
     model_dir = None
     trainer = None

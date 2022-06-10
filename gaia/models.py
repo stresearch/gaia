@@ -7,7 +7,7 @@ from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
-from gaia.data import SCALING_FACTORS
+from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import InterpolateGrid1D, Normalization, ResDNNLayer, make_interpolation_weights
 import os
 import torch_optimizer
@@ -409,6 +409,7 @@ class EncoderDecoder(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.bottleneck_dim = bottleneck_dim
+        self.scale = 8
 
         encoder_layers = ceil(self.num_layers/2)
         decoder_layers = self.num_layers - encoder_layers
@@ -428,8 +429,17 @@ class EncoderDecoder(torch.nn.Module):
                                    leaky_relu=leaky_relu)
 
 
+
     def forward(self,x, return_hidden_state = False):
         b = self.encoder(x)
+
+        if self.scale > 1 and not self.training:
+            b = unflatten_tensor(b)
+            s = self.scale
+            b = F.interpolate(b, scale_factor=[1/s,1/s],mode = "nearest")
+            b = F.interpolate(b, scale_factor=[s,s],mode = "bilinear")
+            b = flatten_tensor(b)
+
         y = self.decoder(b)
         if return_hidden_state:
             return y,b

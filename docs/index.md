@@ -58,4 +58,6 @@ Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 
 - [Milestone Report 1](milestone_reports/milestone_report_1.pdf)
 - [Milestone Report 2](milestone_reports/milestone_report_2.pdf)
+- [Milestone Report 3](milestone_reports/milestone_report_3.pdf)
+- [Milestone Report 4](milestone_reports/milestone_report_4.pdf)
 

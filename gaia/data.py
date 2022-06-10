@@ -457,6 +457,9 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
+        train_years = 2,
+        cache = ".",
+        workers = 1
     ):
 
         ## get files
@@ -476,9 +479,9 @@ class NCDataConstructor:
         logger.info(f"found {len(files)} files")
 
         if split == "train":
-            files = files[: 365 * 2]
+            files = files[: 365 * train_years]
         else:
-            files = files[365 * 2 :]
+            files = files[365 * train_years :]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
@@ -491,9 +494,10 @@ class NCDataConstructor:
             ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
             flatten=split == "train",
+            shuffle = split == "train",
             subsample_factor=4,
             compute_stats=True,
-            cache="/ssddg1/gaia/spcam/test",
+            cache = os.path.join(cache,split),
             s3_client_kwargs=s3_client_kwargs,
             time_steps=2,
         )
@@ -505,7 +509,7 @@ class NCDataConstructor:
 
 
         out = data_constructor.load_files_parallel(
-            files, num_workers=8, save_file=None
+            files, num_workers=workers, save_file=None
         )
 
         if split == "train":
@@ -686,7 +690,11 @@ class NCDataConstructor:
     def subsample_data(self, xi, yi, subsample_factor):
         size = xi.shape[0]
         new_size = size // subsample_factor
-        shuffled_index = torch.randperm(size)[:new_size]
+        if self.shuffle:
+            shuffled_index = torch.randperm(size)[:new_size]
+        else:
+            shuffled_index = torch.arange(0, size, subsample_factor)
+
         xi = xi[shuffled_index, ...]
         yi = yi[shuffled_index, ...]
         return xi, yi, shuffled_index

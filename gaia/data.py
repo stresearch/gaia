@@ -461,10 +461,8 @@ class NCDataConstructor:
         cache = ".",
         workers = 1
     ):
-
-        ## get files
-        aws_access_key_id = "AKIAT3XSPOKEDT22L5PL"
-        aws_secret_access_key = "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"
+        aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
+        aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
 
         s3 = boto3.resource(
             "s3",

@@ -10,7 +10,7 @@ gpu=2
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
 
-python run.py --mode "test" --gpu $gpu --ckpt lightning_logs/version_9
+python run_omega.py mode="train" trainer.params.gpu=[$gpu] ckpt lightning_logs/version_9
 
 # python run.py --mode "train,val,test" --gpu 2 --model_type encoderdecoder --dataset spcam --bottleneck 512
 
@@ -26,6 +26,7 @@ python run.py --mode "test" --gpu $gpu --ckpt lightning_logs/version_9
 # Q,T,SHFLX,OMEGA
 
 
+# python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
 
 
 

@@ -345,11 +345,15 @@ def main(
 
         model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
 
+        # model.model.scale = 16
+
         #bug
         if "var_index_file" not in model.hparams.dataset_params["test"]:
             logger.info("adding var index file")
             model.hparams.dataset_params["test"]["var_index_file"] = model.hparams.dataset_params["test"]["dataset_file"].replace("_test.pt", "_var_index.pt")
 
+
+        # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
         test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
 
@@ -361,7 +365,7 @@ def main(
 
         test_results = trainer.test(model, dataloaders=test_dataloader)
         # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(model_dir, "test_results.json")
+        path_to_save = os.path.join(model_dir, f"test_results_{model.model.scale}.json")
         json.dump(test_results, open(path_to_save, "w"))
 
     if "predict" in mode:

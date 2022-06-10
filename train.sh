@@ -1,15 +1,16 @@
 
 # batch_size=$((2*96*144))
 
-gpu=3
+gpu=2
 # 2 8 
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 1
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 2
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 4
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
-python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
+# python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
 # python run.py --mode "train,val,test" --gpu $gpu --model_type encoderdecoder --dataset spcam --bottleneck 8
 
+python run.py --mode "test" --gpu $gpu --ckpt lightning_logs/version_9
 
 # python run.py --mode "train,val,test" --gpu 2 --model_type encoderdecoder --dataset spcam --bottleneck 512
 

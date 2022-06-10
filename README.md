@@ -4,6 +4,8 @@
 
 *https://stresearch.github.io/gaia/*
 
+![](docs/sections/overview/overview_screenshot.png)
+
 ## Documentation [under construction]
 
 Three groups of parameters:

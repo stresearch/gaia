@@ -1,7 +1,5 @@
 from gaia.export import export
 
-
-
 model_dir = "lightning_logs_hparam/version_0"
 export_name = "export_model_cam4.pt"
 

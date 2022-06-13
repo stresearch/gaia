@@ -1,0 +1,54 @@
+ModelForExport(
+  original_name=ModelForExport
+  (input_normalize): Normalization(original_name=Normalization)
+  (output_normalize): Normalization(original_name=Normalization)
+  (model): FcnBaseline(
+    original_name=FcnBaseline
+    (model): Sequential(
+      original_name=Sequential
+      (0): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (1): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (2): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (3): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (4): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (5): Sequential(
+        original_name=Sequential
+        (0): Linear(original_name=Linear)
+        (1): BatchNorm1d(original_name=BatchNorm1d)
+        (2): Dropout(original_name=Dropout)
+        (3): LeakyReLU(original_name=LeakyReLU)
+      )
+      (6): Linear(original_name=Linear)
+    )
+  )
+)

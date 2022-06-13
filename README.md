@@ -12,7 +12,7 @@ This repository contains code for training and running climate neural network su
 
 >This work is part of the DARPA ACTME (AI-assisted Climate Tipping-point Modeling) AIE Program - https://github.com/ACTM-darpa/info-and-links
 
-![](docs/sections/overview/overview_screenshot.png)
+[![](docs/sections/overview/overview_screenshot.png)](https://stresearch.github.io/gaia/)
 
 
 

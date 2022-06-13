@@ -3,8 +3,8 @@
 Welcome to GAIA Team Project Page, a DARPA AIE ACTM project.
 
 Code repository and documentation for:
--  training NN surrogates: https://github.com/stresearch/gaia
--  deploying NN surrogates in GCM: https://github.com/stresearch/gaia-deploy 
+-  training NN surrogates: [https://github.com/stresearch/gaia](https://github.com/stresearch/gaia)
+-  deploying NN surrogates in GCM (still private, will be made public soon): [https://github.com/stresearch/gaia-deploy](https://github.com/stresearch/gaia-deploy)
 
 ## Project Description <!-- omit in toc --> 
 

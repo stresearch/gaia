@@ -7,4 +7,7 @@ Linearization of f(x`) = Ax` + b, can be computed by computing the gradiant grad
 To visualize how much each input perturbs every output, we l2 normalize each row of J. The following figure breaks up J by different output and input groups. This is computed around the mean input.
 
 ## CAM4
+
+[*Click on figure for interactive visualization*](jacobian.html)
+
 [![](jacobian.png)](jacobian.html)

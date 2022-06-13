@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import json
 import os
+from cv2 import log
 
 from sympy import interpolate
 from gaia.callbacks import WriteGraph
@@ -127,7 +128,7 @@ def default_dataset_params(
     base="/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
     mean_thres=1e-13,
 ):
-    raise DeprecationWarning
+    logger.exception(DeprecationWarning)
     var_index_file = base + "_var_index.pt"
 
     return dict(
@@ -209,12 +210,12 @@ def default_dataset_params_v1(
 
 
 def default_model_params(**kwargs):
-    raise DeprecationWarning
+    logger.exception(DeprecationWarning)
     d = dict(
         lr=1e-3,
         optimizer="adam",
         model_config={
-            "model_type": "fcn_history",
+            "model_type": "fcn",
             "num_layers": 7,
         },
     )
@@ -232,7 +233,7 @@ def load_hparams_file(model_dir):
 
 
 def default_trainer_params(**kwargs):
-    raise DeprecationWarning
+    logger.exception(DeprecationWarning)
     d = dict(precision=16,max_epochs=200)
     d.update(kwargs)
     return d

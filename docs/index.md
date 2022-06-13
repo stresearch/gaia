@@ -28,6 +28,7 @@ Code repository and documentation for:
 - [Integration of AI Surrogate into GCM](sections/gcm_integration/README.md) - deploying GAIA ML model in the GCM
 - [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets
 - [Surrogate Bottleneck Analysis](sections/bottleneck/README.md) - analysis of bottleneck dimension of the surrogate model
+- [Linearization](sections/linearization/README.md) - we analyze linearlziation of surrogate models to understand sensitivy to inputs
 
 
 ## Overview

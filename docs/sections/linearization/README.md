@@ -1,6 +1,6 @@
 # Linearization of NN Surrogate Model
 
-We compute linearlization of the NN surrigate f(x) = y, to understand sensitivity to different inputs.
+We compute linearization of the NN surrigate f(x) = y, to understand sensitivity to different inputs.
 
 Linearization of f(x`) = Ax` + b, can be computed by computing the gradiant grad f(x) around x`. Since f(x) is vector valued we compute a jacobian: A = J_x(f(x)). 
 

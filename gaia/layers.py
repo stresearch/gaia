@@ -39,7 +39,8 @@ class InterpolateGrid1D(torch.nn.Module):
         super().__init__()
         self.linear = torch.nn.Linear(len(input_grid), len(output_grid), bias=False)
         output_grid, input_grid = torch.tensor(output_grid), torch.tensor(input_grid)
-        self.linear.weight.data = make_interpolation_weights(output_grid, input_grid)
+        with torch.no_grad():
+            self.linear.weight.data = make_interpolation_weights(output_grid, input_grid)
         self.input_grid_index = input_grid_index
         self.output_grid_index = output_grid_index
 

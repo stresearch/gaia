@@ -39,13 +39,13 @@ def run():
     parser.add_argument("--memory_variables", default=None, type=str)
     parser.add_argument(
         "--dataset",
-        default="cam4",
+        default="spcam",
         type=str,
     )
-    parser.add_argument("--gpu", default=1, type=int)
+    parser.add_argument("--gpu", default=2, type=int)
     parser.add_argument("--model_type", default="baseline", type=str)
-    parser.add_argument("--mode", default="train", type=str)
-    parser.add_argument("--ckpt", default=None, type=str)
+    parser.add_argument("--mode", default="test", type=str)
+    parser.add_argument("--ckpt", default="lightning_logs/version_1", type=str)
     parser.add_argument("--hidden_size", default=512, type=int)
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--num_layers", default=7, type=int)
@@ -55,6 +55,8 @@ def run():
     parser.add_argument("--max_epochs", default=200, type=int)
     parser.add_argument("--leaky_relu", default=0.15, type=float)
     parser.add_argument("--bottleneck", default=32, type = int)
+    parser.add_argument("--pretrained", default="lightning_logs_hparam/version_0", type = str)
+
 
     args = parser.parse_args()
 
@@ -132,6 +134,7 @@ def run():
             replace_std_with_range=False,
             model_config=model_config,
             ckpt=args.ckpt,
+            pretrained = args.pretrained
         ),
     )
 

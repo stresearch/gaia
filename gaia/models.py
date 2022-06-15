@@ -86,9 +86,10 @@ class TrainingModel(LightningModule):
 
         if loss_output_weights is not None:
             logger.info(f"using output weights {loss_output_weights}")
-            w = torch.tensor(loss_output_weights)
-            w *= w.shape[0] / w.sum()
-            self.register_buffer("loss_output_weights", w)
+            # w = torch.tensor(loss_output_weights)
+            # w *= w.shape[0] / w.sum()
+            self.make_output_weights(loss_output_weights)
+            
 
         # if min_mean_thres is not None:
         #     if loss_output_weights is not None:
@@ -98,29 +99,37 @@ class TrainingModel(LightningModule):
         if interpolate is not None:
             logger.info(f"setting up interpolation")
 
+            do_optimize = interpolate["optimize"]
+
             self.interpolate_data_to_model_input = InterpolateGrid1D(
                 input_grid=interpolate["input_grid"],
                 output_grid=interpolate["output_grid"],
                 input_grid_index=interpolate["input_index"], #for the data
                 output_grid_index=input_index, #for the model
-            ).requires_grad_(False)
+            ).requires_grad_(do_optimize)
 
             self.interpolate_data_to_model_output = InterpolateGrid1D(
                 input_grid=interpolate["input_grid"],
                 output_grid=interpolate["output_grid"],
                 input_grid_index=interpolate["output_index"], #for the model
                 output_grid_index=output_index,  #for the data
-            ).requires_grad_(False)
+            ).requires_grad_(do_optimize)
 
             self.interpolate_model_to_data_output = InterpolateGrid1D(
                 input_grid=interpolate["output_grid"],
                 output_grid=interpolate["input_grid"],
                 input_grid_index=output_index, #for the model
                 output_grid_index=interpolate["output_index"],  #for the data
-            ).requires_grad_(False)
+            ).requires_grad_(do_optimize)
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
+
+    def make_output_weights(self, loss_output_weights):
+        w = torch.tensor(loss_output_weights)
+        w *= w.shape[0] / w.sum()
+        self.register_buffer("loss_output_weights", w)
+        return w
 
     def setup_normalize(self, data_stats):
         if isinstance(data_stats, str) and os.path.exists(data_stats):
@@ -140,6 +149,9 @@ class TrainingModel(LightningModule):
                 list(self.hparams.input_index.values())[-1][-1],
                 list(self.hparams.output_index.values())[-1][-1],
             ]
+
+            if self.hparams.interpolate is not None:
+                sizes[-1] = list(self.hparams.interpolate["output_index"].values())[-1][-1]
 
             for v in sizes:
                 layers.append(
@@ -163,16 +175,6 @@ class TrainingModel(LightningModule):
             output_norm = self.get_normalization(stats["output_stats"], zero_mean=True)
 
         return input_norm, output_norm
-
-        # for k in vars_to_setup_norm_for:
-        #     # stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
-        #     stats[k]["range"] = torch.maximum(
-        #         stats[k]["max"] - stats[k]["mean"], stats[k]["mean"] - stats[k]["min"]
-        #     )
-        #     stats[k]["std_eff"] = torch.where(
-        #         stats[k]["std"] > 1e-9, stats[k]["std"], stats[k]["range"]
-        #     )
-        #     layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
 
     def get_predefined_output_normalization(self):
         mean = torch.zeros(self.hparams.model_config["output_size"])
@@ -231,8 +233,8 @@ class TrainingModel(LightningModule):
 
             if self.hparams.interpolate is not None:
                 x = self.interpolate_data_to_model_input(x)
-                y1 = self.interpolate_data_to_model_output(y1)
-                y2 = self.interpolate_data_to_model_output(y2)
+                # y1 = self.interpolate_data_to_model_output(y1)
+                # y2 = self.interpolate_data_to_model_output(y2)
 
             x = self.input_normalize(x)
             x = self.select_input_variables(x)
@@ -254,7 +256,7 @@ class TrainingModel(LightningModule):
 
             if self.hparams.interpolate is not None:
                 x = self.interpolate_data_to_model_input(x)
-                y = self.interpolate_data_to_model_output(y)
+                # y = self.interpolate_data_to_model_output(y)
 
             x = self.input_normalize(x)
             y = self.output_normalize(y)
@@ -278,6 +280,10 @@ class TrainingModel(LightningModule):
             raise ValueError("wrong size of x")
 
         yhat = self(x)
+
+        if self.hparams.interpolate is not None:
+            yhat = self.interpolate_model_to_data_output(yhat)
+
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
 

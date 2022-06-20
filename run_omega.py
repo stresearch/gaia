@@ -18,10 +18,9 @@ from gaia.plot import plot_results
 from gaia.config import Config
 
 if __name__ == "__main__":
-    config = Config()
-    config.merge_cli_args()
+    config = Config.readCLIargs()
     
-    main(mode = config.config['mode'],
+    main(mode=config.config['mode'],
          trainer_params=config.config['trainer_params'],
          dataset_params=config.config['dataset_params'],
          model_params=config.config['model_params'],

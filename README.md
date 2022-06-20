@@ -74,8 +74,8 @@ python run_omega.py \
 mode='train,val,test,predict' \
 trainer_params.max_epochs=200 \
 trainer_params.gpus=[0] \
-model_params.model_type="baseline" \
-dataset_params.dataset = 'cam4' \
+model_params.model_type="fcn" \
+dataset_params.dataset='cam4' \
 
 ```
 

@@ -49,7 +49,6 @@ class Config():
         Get the CLI args to override defaults during runtime
         """       
         cli_args = OmegaConf.to_container(OmegaConf.from_cli())
-        print(type(cli_args))
         t = json.dumps(cli_args).translate(r'{}:\"\'')
         logger.info(f'CLI parameters: \n{t}')
         return cls(cli_args = cli_args)

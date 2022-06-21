@@ -18,7 +18,7 @@ class Config():
         Set default model parameters
         """
         # set general params (mode, seed, etc.)
-        self.mode = 'train,val,test,predict'
+        self.mode = 'train,val,test'
         self.seed = True
         self.interpolation_params = None
         
@@ -78,26 +78,26 @@ class Config():
         base = dataset_paths[dataset]
         mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
         var_index_file = base + "_var_index.pt"
-        batch_size_default = 24 * 96 * 144
+        batch_size = cli_args.get('dataset_params',{}).get("batch_size",24 * 96 * 144)
         
         dataset_params = dict(
             train=dict(
                 dataset_file=base + "_train.pt",
-                batch_size=batch_size_default,
+                batch_size=batch_size,
                 shuffle=True,
                 flatten=False,  # already flattened
                 var_index_file=var_index_file
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
-                batch_size=batch_size_default,
+                batch_size=batch_size,
                 shuffle=False,
                 flatten=False,  # already flattened
                 var_index_file=var_index_file
             ),
             test=dict(
                 dataset_file=base+'_var_index.pt',
-                batch_size=batch_size_default,
+                batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened
                 var_index_file=var_index_file

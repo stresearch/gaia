@@ -3,6 +3,7 @@ import os
 
 # os.environ["CUDA_LAUNCH_BLOCKING"]="1"
 import glob
+from mergedeep import Strategy
 import numpy as np
 from gaia.evaluate import process_results
 from gaia import get_logger
@@ -39,23 +40,23 @@ def run():
     parser.add_argument("--memory_variables", default=None, type=str)
     parser.add_argument(
         "--dataset",
-        default="spcam",
+        default="cam4",
         type=str,
     )
     parser.add_argument("--gpu", default=2, type=int)
     parser.add_argument("--model_type", default="baseline", type=str)
-    parser.add_argument("--mode", default="test", type=str)
-    parser.add_argument("--ckpt", default="lightning_logs/version_1", type=str)
+    parser.add_argument("--mode", default="train,val,test", type=str)
+    parser.add_argument("--ckpt", default=None, type=str)
     parser.add_argument("--hidden_size", default=512, type=int)
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--num_layers", default=7, type=int)
-    parser.add_argument("--batch_size", default=24 * 96 * 144, type=int)
+    parser.add_argument("--batch_size", default=24 * 96 * 144, type=int) #24 * 96 * 144 96 * 144 // 2
     parser.add_argument("--dropout", default=0.01, type=float)
     parser.add_argument("--mean_thres", default=None, type=float)
     parser.add_argument("--max_epochs", default=200, type=int)
     parser.add_argument("--leaky_relu", default=0.15, type=float)
     parser.add_argument("--bottleneck", default=32, type = int)
-    parser.add_argument("--pretrained", default="lightning_logs_hparam/version_0", type = str)
+    parser.add_argument("--pretrained", default=None, type = str)
 
 
     args = parser.parse_args()
@@ -111,6 +112,12 @@ def run():
             "bottleneck_dim": args.bottleneck,
             #   "num_output_layers": 6
         }
+    elif args.model_type == "transformer":
+        model_config = {
+            "model_type": "transformer",
+            "num_layers": args.num_layers,
+            "hidden_size": args.hidden_size,
+        }
     else:
         raise ValueError
 
@@ -134,8 +141,10 @@ def run():
             replace_std_with_range=False,
             model_config=model_config,
             ckpt=args.ckpt,
-            pretrained = args.pretrained
+            pretrained = args.pretrained,
+            lr_schedule = "cosine"
         ),
+        seed = True
     )
 
 

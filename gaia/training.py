@@ -19,7 +19,7 @@ import glob
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from gaia.plot import levels26, levels, get_levels
 import yaml
 
@@ -43,7 +43,7 @@ def get_checkpoint_file(file):
             raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
-def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-13):
+def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-13, levels = None):
 
     model_params["model_config"].update(
         {
@@ -69,7 +69,23 @@ def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-1
         loss_output_weights[ignore_outputs] = 0.0
         logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
+        if levels:
+            level_weights = torch.tensor([0] + levels).diff()
+            temp = []
+            for o,(s,e) in dataset_dict["output_index"].items():
+                if e-s > 1:
+                    temp.append(level_weights)
+                else:
+                    temp.append(torch.ones(1)*level_weights.mean())
+
+            level_weights = torch.cat(temp)
+
+            loss_output_weights = level_weights*loss_output_weights
+
+
         model_params["loss_output_weights"] = loss_output_weights.tolist()
+
+    
 
 
 def default_dataset_params(
@@ -172,8 +188,11 @@ def main(
 
         mean_thres = dataset_params["mean_thres"]
 
+        #TODO fix
+        dataset_name = "cam4" if "cam4" in dataset_params["train"]["dataset_file"] else "spcam"
+
         update_model_params_from_dataset(
-            train_dataset, model_params, mean_thres=mean_thres
+            train_dataset, model_params, mean_thres=mean_thres, levels = get_levels(dataset_name)
         )
 
        
@@ -185,7 +204,7 @@ def main(
         # write_graph = WriteGraph()
 
         trainer = pl.Trainer(
-            callbacks=[checkpoint_callback],
+            callbacks=[checkpoint_callback, LearningRateMonitor()],
             log_every_n_steps=max(1, len(train_dataloader) // 100),
             **trainer_params,
         )

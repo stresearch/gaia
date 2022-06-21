@@ -18,7 +18,7 @@ class Config():
         Set default model parameters
         """
         # set general params (mode, seed, etc.)
-        self.mode = 'train,val'
+        self.mode = 'train,val,test,predict'
         self.seed = True
         self.interpolation_params = None
         

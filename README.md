@@ -84,8 +84,9 @@ dataset_params.dataset='cam4' \
 For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
 
 Parameters can be specified by 
-- directly passing nested dictionaries for each or 
-- command line arcugemens using the `dot` notation
+- directly passing nested dictionaries for each
+- pass in nothing which will automatically read in defaults from Config
+- command line arcugemens using the `dot` notation to override specified Config defaults
 
 Example configs:
 

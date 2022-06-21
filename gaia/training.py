@@ -160,14 +160,13 @@ def make_pretty_for_log(d, max_char=100):
     )
 
 
-
 def main(
     mode="train",
-    trainer_params=Config().trainer_params,
-    dataset_params=Config().dataset_params,
-    model_params=Config().model_params,
-    seed=Config().seed,
-    interpolation_params = Config().interpolation_params
+    trainer_params=Config.set_trainer_params(),
+    dataset_params=Config.set_dataset_params(),
+    model_params=Config.set_model_params(),
+    seed=True,
+    interpolation_params = None
 ):
     if seed:
         logger.info("seeding everything")

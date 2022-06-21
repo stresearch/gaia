@@ -74,8 +74,8 @@ python run_omega.py \
 mode='train,val,test,predict' \
 trainer_params.max_epochs=200 \
 trainer_params.gpus=[0] \
-model_params.model_type="baseline" \
-dataset_params.dataset = 'cam4' \
+model_params.model_type="fcn" \
+dataset_params.dataset='cam4' \
 
 ```
 
@@ -84,8 +84,9 @@ dataset_params.dataset = 'cam4' \
 For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
 
 Parameters can be specified by 
-- directly passing nested dictionaries for each or 
-- command line arcugemens using the `dot` notation
+- directly passing nested dictionaries for each
+- pass in nothing which will automatically read in defaults from Config
+- command line arcugemens using the `dot` notation to override specified Config defaults
 
 Example configs:
 

@@ -166,6 +166,12 @@ def model_type_lookup(model_type):
             "leaky_relu": 0.15,
             "bottleneck_dim": 32,
         }
+    elif model_type == "transformer":
+        model_config = {
+            "model_type": "transformer",
+            "num_layers": 3,
+            "hidden_size": 128,
+        }
     else:
         raise ValueError
     

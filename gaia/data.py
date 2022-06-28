@@ -753,6 +753,13 @@ class NCDataConstructor:
         #         logger.warning(f"failed {args}, {kwargs}")
         #         return
 
+        logger.info("delete cache files if any")
+
+        os.makedirs(self.cache, exist_ok=True)
+
+        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache,"*"))):
+            os.remove(f)
+
         logger.info("downloading files")
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:

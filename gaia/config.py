@@ -31,12 +31,10 @@ class Config():
                 
         # general config
         self.config = dict(
-            mode = self.general_params['mode'],
+            general_params = self.general_params,
             trainer_params = self.trainer_params,
             dataset_params = self.dataset_params,
-            model_params = self.model_params,
-            seed = self.general_params['seed'],
-            interpolation_params = self.general_params['interpolation_params'],
+            model_params = self.model_params
         )
         logger.info(f"Config: \n{yaml.dump(self.config, indent=2)}")
 

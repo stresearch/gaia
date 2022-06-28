@@ -17,10 +17,8 @@ class Config():
         """
         Set default model parameters
         """
-        # set general params (mode, seed, etc.)
-        self.mode = 'train,val,test'
-        self.seed = True
-        self.interpolation_params = None
+        # set general params (mode, seed, interpolation_params)    
+        self.general_params = self.set_general_params(cli_args)
         
         # set trainer params 
         self.trainer_params = self.set_trainer_params(cli_args)
@@ -33,12 +31,12 @@ class Config():
                 
         # general config
         self.config = dict(
-            mode = self.mode,
+            mode = self.general_params['mode'],
             trainer_params = self.trainer_params,
             dataset_params = self.dataset_params,
             model_params = self.model_params,
-            seed = self.seed,
-            interpolation_params = self.interpolation_params,
+            seed = self.general_params['seed'],
+            interpolation_params = self.general_params['interpolation_params'],
         )
         logger.info(f"Config: \n{yaml.dump(self.config, indent=2)}")
 
@@ -52,6 +50,19 @@ class Config():
         t = json.dumps(cli_args).translate(r'{}:\"\'')
         logger.info(f'CLI parameters: \n{t}')
         return cls(cli_args = cli_args)
+    
+    @staticmethod
+    def set_general_params(cli_args=dict()):
+        """
+        Set trainer params
+        """
+        default_general_params = dict(
+            mode='trian,val,test',
+            seed=True,
+            interpolation_params=None
+        )
+        return merge(default_general_params, cli_args.get('general_params',{}))
+
     
     @staticmethod
     def set_trainer_params(cli_args=dict()):

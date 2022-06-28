@@ -20,10 +20,10 @@ from gaia.config import Config
 if __name__ == "__main__":
     config = Config.readCLIargs()
     
-    main(mode=config.config['mode'],
+    main(mode=config.config['general_params']['mode'],
          trainer_params=config.config['trainer_params'],
          dataset_params=config.config['dataset_params'],
          model_params=config.config['model_params'],
-         seed=config.config['seed'],
-         interpolation_params=config.config['interpolation_params']
+         seed=config.config['general_params']['seed'],
+         interpolation_params=config.config['general_params']['interpolation_params']
          )

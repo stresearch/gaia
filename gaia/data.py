@@ -491,13 +491,13 @@ class NCDataConstructor:
                 ","
             ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten=split == "train",
-            shuffle = split == "train",
+            flatten= False,
+            shuffle = False,
             subsample_factor=4,
             compute_stats=True,
             cache = os.path.join(cache,split),
             s3_client_kwargs=s3_client_kwargs,
-            time_steps=2,
+            time_steps=0,
         )
 
 
@@ -752,6 +752,13 @@ class NCDataConstructor:
         #         logger.exception(e)
         #         logger.warning(f"failed {args}, {kwargs}")
         #         return
+
+        logger.info("delete cache files if any")
+
+        os.makedirs(self.cache, exist_ok=True)
+
+        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache,"*"))):
+            os.remove(f)
 
         logger.info("downloading files")
 

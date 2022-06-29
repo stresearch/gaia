@@ -76,8 +76,8 @@ class TrainingModel(LightningModule):
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
-        elif model_type == "conv":
-            self.model = ConvNet1x1(**model_config)
+        elif model_type == "conv2d":
+            self.model = ConvNet2D(**model_config)
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
         elif model_type == "conv1d":
@@ -309,6 +309,8 @@ class TrainingModel(LightningModule):
         if self.hparams.interpolate is not None:
             yhat = self.interpolate_model_to_data_output(yhat)
 
+        
+
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
 
@@ -339,8 +341,17 @@ class TrainingModel(LightningModule):
                         loss_name = f"skill_ave_trunc_{k}_{i:02}"
                         loss[loss_name] = skill[i]
 
+
         if self.hparams.loss_output_weights is not None:
-            mse = mse * self.loss_output_weights[None, :]
+
+            num_dims = len(mse.shape)
+            if num_dims == 4:
+                mse = mse * self.loss_output_weights[None,:, None, None]
+            elif num_dims == 2:
+                mse = mse * self.loss_output_weights[None,:]
+            else:
+                raise ValueError("wrong number of dims in mse")
+    
 
         loss["mse"] = mse.mean()
         for k, v in loss.items():
@@ -827,7 +838,7 @@ class TransformerModel(torch.nn.Module):
         return y
 
 
-class ConvNet1x1(torch.nn.Module):
+class ConvNet2D(torch.nn.Module):
     def __init__(
         self,
         input_size=26 * 2,
@@ -836,6 +847,7 @@ class ConvNet1x1(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        kernel_size: int = 3,
         model_type=None,
     ):
         super().__init__()
@@ -846,13 +858,14 @@ class ConvNet1x1(torch.nn.Module):
         self.dropout = dropout
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
+        self.kernel_size = kernel_size
 
         self.model = self.make_model()
 
     def make_model(self):
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
-                torch.nn.Conv2d(ins, outs, kernel_size=1, bias=False),
+                torch.nn.Conv2d(ins, outs, kernel_size=self.kernel_size, bias=False, padding = "same"),
                 torch.nn.BatchNorm2d(outs),
                 torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
@@ -865,7 +878,7 @@ class ConvNet1x1(torch.nn.Module):
             for _ in range(self.num_layers - 2)
         ]
         output_layer = torch.nn.Conv2d(
-            self.hidden_size, self.output_size, kernel_size=1, bias=True
+            self.hidden_size, self.output_size, kernel_size=1,padding = "same", bias=True
         )
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)

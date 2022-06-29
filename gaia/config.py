@@ -9,6 +9,7 @@ import re
 logger = get_logger(__name__)
 
 class Config():
+    valid_top_level = ["mode","seed","interpolation_params","dataset_params" ,"trainer_params","model_params" ]
     """
     Initialize config with default parameter
     then parse cli args and merge
@@ -18,31 +19,42 @@ class Config():
         Set default model parameters
         """
         # set general params (mode, seed, etc.)
-        self.mode = 'train,val,test'
-        self.seed = True
-        self.interpolation_params = None
+
+        for k in cli_args:
+            if k not in self.valid_top_level:
+                logger.warn(f"{k} invalid top level param category, ignoring")
+                cli_args.pop(k)
+
+        mode = 'train,val,test'
+        seed = True
+        interpolation_params = None
         
         # set trainer params 
-        self.trainer_params = self.set_trainer_params(cli_args)
+        trainer_params = self.set_trainer_params(cli_args)
         
         # set dataset params
-        self.dataset_params = self.set_dataset_params(cli_args)
+        dataset_params = self.set_dataset_params(cli_args)
         
         # set model params
-        self.model_params = self.set_model_params(cli_args)
+        model_params = self.set_model_params(cli_args)
                 
         # general config
-        self.config = dict(
-            mode = self.mode,
-            trainer_params = self.trainer_params,
-            dataset_params = self.dataset_params,
-            model_params = self.model_params,
-            seed = self.seed,
-            interpolation_params = self.interpolation_params,
+        config = dict(
+            mode = mode,
+            trainer_params = trainer_params,
+            dataset_params = dataset_params,
+            model_params = model_params,
+            seed = seed,
+            interpolation_params = interpolation_params,
         )
-        logger.info(f"Config: \n{yaml.dump(self.config, indent=2)}")
+        self.config = merge(config, cli_args)
 
-        
+        logger.info(f"Config: \n{self}")
+
+
+    def __repr__(self) -> str:
+        return yaml.dump(self.config, indent=2)
+
     @classmethod
     def readCLIargs(cls):
         """
@@ -63,7 +75,8 @@ class Config():
             precision=16,
             max_epochs=200
         )
-        return merge(default_trainer_params, cli_args.get('trainer_params',{}))
+        return default_trainer_params
+        # return merge(default_trainer_params, cli_args.get('trainer_params',{}))
     
     @staticmethod
     def set_dataset_params(cli_args=dict()):
@@ -96,7 +109,7 @@ class Config():
                 var_index_file=var_index_file
             ),
             test=dict(
-                dataset_file=base+'_var_index.pt',
+                dataset_file=base+'_test.pt',
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened
@@ -104,21 +117,24 @@ class Config():
             ),
             mean_thres=mean_thres_defaults[dataset]
         )
-        return merge(dataset_params, cli_args.get('dataset_params',{}))
+        return dataset_params
+        # return merge(dataset_params, cli_args.get('dataset_params',{}))
     
     @staticmethod
     def set_model_params(cli_args=dict()):
         model_config = model_type_lookup(cli_args.get('model_params',{}).get('model_type', 'fcn'))
         model_params = dict(
-            memory_varaibles=None,      # can be ',' sep
+            memory_variables=None,      # can be ',' sep
             ignore_input_variables=None,# can be ',' sep
             model_config = model_config,
             lr=1e-3,
             use_output_scaling=False,
             replace_std_with_range=False,
             ckpt=None,
+            lr_schedule = "cosine"
         )
-        return merge(model_params, cli_args.get('model_params',{}))
+        return model_params
+        # return merge(model_params, cli_args.get('model_params',{}))
 
     
 def model_type_lookup(model_type):
@@ -147,6 +163,14 @@ def model_type_lookup(model_type):
             "model_type": "conv1d",
             "num_layers": 7,
             "hidden_size": 128
+        }
+
+    elif model_type == "conv2d":
+        model_config = {
+            "model_type": "conv2d",
+            "num_layers": 7,
+            "hidden_size": 176,
+            "kernel_size": 3,
         }
 
     elif model_type == "resdnn":

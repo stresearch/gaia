@@ -83,13 +83,26 @@ class Config():
         """
         Set the dataset params
         """
-        dataset_paths = {
-            "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
-            "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
-        }
-        dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
-        base = dataset_paths[dataset]
-        mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
+        base = cli_args.get('dataset_params',{}).get("prefix",None)
+
+        if base is None:
+            dataset_paths = {
+                "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
+                "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
+                "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
+                "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
+            }
+
+            dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
+            base = dataset_paths[dataset]
+            
+        if "cam4" in dataset:
+            mean_thres = 1e-13
+        elif "spcam" in dataset:
+            mean_thres = 1e-15
+        else:
+            raise ValueError(f"unknown dataset {dataset}")
+
         var_index_file = base + "_var_index.pt"
         batch_size = cli_args.get('dataset_params',{}).get("batch_size",24 * 96 * 144)
         
@@ -115,7 +128,7 @@ class Config():
                 flatten=True,  # already flattened
                 var_index_file=var_index_file
             ),
-            mean_thres=mean_thres_defaults[dataset]
+            mean_thres=mean_thres
         )
         return dataset_params
         # return merge(dataset_params, cli_args.get('dataset_params',{}))

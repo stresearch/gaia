@@ -50,8 +50,8 @@ def update_model_params_from_dataset(
 
     model_params["model_config"].update(
         {
-            "input_size": dataset_dict["x"].shape[2],
-            "output_size": dataset_dict["y"].shape[2],
+            "input_size": list(dataset_dict["input_index"].values())[-1][-1], #ordered dict of {"var":(s,e)}
+            "output_size": list(dataset_dict["output_index"].values())[-1][-1],
         }
     )
 

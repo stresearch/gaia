@@ -1,14 +1,14 @@
-from asyncio.log import logger
 from collections import OrderedDict
 from math import ceil
 from turtle import forward
-from typing import List
+from typing import List, ValuesView
 from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (
+    Conv2dDS,
     InterpolateGrid1D,
     Normalization,
     ResDNNLayer,
@@ -19,7 +19,8 @@ import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
-
+from gaia import get_logger
+logger = get_logger(__name__)
 
 class TrainingModel(LightningModule):
     def __init__(
@@ -848,6 +849,7 @@ class ConvNet2D(torch.nn.Module):
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
         kernel_size: int = 3,
+        conv_type: str = "conv2d",
         model_type=None,
     ):
         super().__init__()
@@ -859,13 +861,20 @@ class ConvNet2D(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.kernel_size = kernel_size
-
+        self.conv_type = conv_type
         self.model = self.make_model()
 
     def make_model(self):
+        if self.conv_type == 'conv2d':
+            conv = torch.nn.Conv2d
+        elif self.conv_type == "conv2d_ds":
+            conv = Conv2dDS
+        else:
+            raise ValueError(f"unknown {self.conv_typ}")
         def make_layer(ins, outs):
+            
             layer = torch.nn.Sequential(
-                torch.nn.Conv2d(ins, outs, kernel_size=self.kernel_size, bias=False, padding = "same"),
+                conv(ins, outs, kernel_size=self.kernel_size, bias=True, padding = "same"),
                 torch.nn.BatchNorm2d(outs),
                 torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
@@ -877,9 +886,10 @@ class ConvNet2D(torch.nn.Module):
             make_layer(self.hidden_size, self.hidden_size)
             for _ in range(self.num_layers - 2)
         ]
-        output_layer = torch.nn.Conv2d(
-            self.hidden_size, self.output_size, kernel_size=1,padding = "same", bias=True
+        output_layer = conv(
+            self.hidden_size, self.output_size, kernel_size=self.kernel_size, padding = "same", bias=True
         )
+
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 

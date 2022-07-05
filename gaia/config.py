@@ -13,21 +13,21 @@ class Config():
     Initialize config with default parameter
     then parse cli args and merge
     """
-    def __init__(self, cli_args=dict()):
+    def __init__(self, args=dict()):
         """
         Set default model parameters
         """
         # set general params (mode, seed, interpolation_params)    
-        self.general_params = self.set_general_params(cli_args)
+        self.general_params = self.set_general_params(args)
         
         # set trainer params 
-        self.trainer_params = self.set_trainer_params(cli_args)
+        self.trainer_params = self.set_trainer_params(args)
         
         # set dataset params
-        self.dataset_params = self.set_dataset_params(cli_args)
+        self.dataset_params = self.set_dataset_params(args)
         
         # set model params
-        self.model_params = self.set_model_params(cli_args)
+        self.model_params = self.set_model_params(args)
                 
         # general config
         self.config = dict(
@@ -48,6 +48,16 @@ class Config():
         t = json.dumps(cli_args).translate(r'{}:\"\'')
         logger.info(f'CLI parameters: \n{t}')
         return cls(cli_args = cli_args)
+    
+    @classmethod
+    def readList(cls, dotlist=[]):
+        """
+        Create the Config from a list if dot notation strings.
+        """
+        list_args = OmegaConf.to_container(OmegaConf.from_dotlist(dotlist))
+        t = json.dumps(list_args).translate(r'{}:\"\'')
+        logger.info(f'CLI parameters: \n{t}')
+        return cls(args = list_args)
     
     @staticmethod
     def set_general_params(cli_args=dict()):

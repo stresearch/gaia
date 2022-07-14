@@ -457,11 +457,12 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
+        train_years = 2,
+        cache = ".",
+        workers = 1
     ):
-
-        ## get files
-        aws_access_key_id = "AKIAT3XSPOKEDT22L5PL"
-        aws_secret_access_key = "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"
+        aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
+        aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
 
         s3 = boto3.resource(
             "s3",
@@ -476,9 +477,9 @@ class NCDataConstructor:
         logger.info(f"found {len(files)} files")
 
         if split == "train":
-            files = files[: 365 * 2]
+            files = files[: 365 * train_years]
         else:
-            files = files[365 * 2 :]
+            files = files[365 * train_years :]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
@@ -490,12 +491,13 @@ class NCDataConstructor:
                 ","
             ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten=split == "train",
+            flatten= False,
+            shuffle = False,
             subsample_factor=4,
             compute_stats=True,
-            cache="/ssddg1/gaia/spcam/test",
+            cache = os.path.join(cache,split),
             s3_client_kwargs=s3_client_kwargs,
-            time_steps=2,
+            time_steps=0,
         )
 
 
@@ -505,7 +507,7 @@ class NCDataConstructor:
 
 
         out = data_constructor.load_files_parallel(
-            files, num_workers=8, save_file=None
+            files, num_workers=workers, save_file=None
         )
 
         if split == "train":
@@ -513,14 +515,17 @@ class NCDataConstructor:
             # lets make dedicated train and val so that we dont have to worry about it anymore
             x = out.pop("x")
             y = out.pop("y")
+            index = out.pop("index")
 
             mask = torch.rand(x.shape[0]) > 0.1  # .9 train
 
             xtrain = x[mask, ...]
             ytrain = y[mask, ...]
+            index_train = index[mask]
 
             out["x"] = xtrain
             out["y"] = ytrain
+            out["index"] = index_train
 
             torch.save(
                 out,
@@ -532,9 +537,11 @@ class NCDataConstructor:
 
             xval = x[~mask, ...]
             yval = y[~mask, ...]
+            index_val = index[~mask]
 
             out["x"] = xval
             out["y"] = yval
+            out["index"] = index_val
 
             torch.save(
                 out,
@@ -681,7 +688,11 @@ class NCDataConstructor:
     def subsample_data(self, xi, yi, subsample_factor):
         size = xi.shape[0]
         new_size = size // subsample_factor
-        shuffled_index = torch.randperm(size)[:new_size]
+        if self.shuffle:
+            shuffled_index = torch.randperm(size)[:new_size]
+        else:
+            shuffled_index = torch.arange(0, size, subsample_factor)
+
         xi = xi[shuffled_index, ...]
         yi = yi[shuffled_index, ...]
         return xi, yi, shuffled_index
@@ -741,6 +752,13 @@ class NCDataConstructor:
         #         logger.exception(e)
         #         logger.warning(f"failed {args}, {kwargs}")
         #         return
+
+        logger.info("delete cache files if any")
+
+        os.makedirs(self.cache, exist_ok=True)
+
+        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache,"*"))):
+            os.remove(f)
 
         logger.info("downloading files")
 

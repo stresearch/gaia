@@ -1,17 +1,24 @@
 from asyncio.log import logger
 from collections import OrderedDict
+from math import ceil
 from turtle import forward
 from typing import List
 from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
-from gaia.data import SCALING_FACTORS
-from gaia.layers import InterpolateGrid1D, Normalization, make_interpolation_weights
+from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
+from gaia.layers import (
+    InterpolateGrid1D,
+    Normalization,
+    ResDNNLayer,
+    make_interpolation_weights,
+)
 import os
 import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
+from gaia.optim import get_cosine_schedule_with_warmup
 
 
 class TrainingModel(LightningModule):
@@ -29,6 +36,8 @@ class TrainingModel(LightningModule):
         memory_variables=None,
         ignore_input_variables=None,
         interpolate=None,
+        predict_hidden_states=False,
+        lr_schedule = None,
         **kwargs,
     ):
         super().__init__()
@@ -72,7 +81,13 @@ class TrainingModel(LightningModule):
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
         elif model_type == "conv1d":
-            self.model = ConvNet1D(
+            self.model = ConvNet1D(**model_config)
+        elif model_type == "resdnn":
+            self.model = ResDNN(**model_config)
+        elif model_type == "encoderdecoder":
+            self.model = EncoderDecoder(**model_config)
+        elif model_type == "transformer":
+            self.model = TransformerModel(
                 input_index=input_index, output_index=output_index, **model_config
             )
         else:
@@ -80,9 +95,9 @@ class TrainingModel(LightningModule):
 
         if loss_output_weights is not None:
             logger.info(f"using output weights {loss_output_weights}")
-            w = torch.tensor(loss_output_weights)
-            w *= w.shape[0] / w.sum()
-            self.register_buffer("loss_output_weights", w)
+            # w = torch.tensor(loss_output_weights)
+            # w *= w.shape[0] / w.sum()
+            self.make_output_weights(loss_output_weights)
 
         # if min_mean_thres is not None:
         #     if loss_output_weights is not None:
@@ -92,29 +107,37 @@ class TrainingModel(LightningModule):
         if interpolate is not None:
             logger.info(f"setting up interpolation")
 
+            do_optimize = interpolate["optimize"]
+
             self.interpolate_data_to_model_input = InterpolateGrid1D(
                 input_grid=interpolate["input_grid"],
                 output_grid=interpolate["output_grid"],
-                input_grid_index=interpolate["input_index"], #for the data
-                output_grid_index=input_index, #for the model
-            ).requires_grad_(False)
+                input_grid_index=interpolate["input_index"],  # for the data
+                output_grid_index=input_index,  # for the model
+            ).requires_grad_(do_optimize)
 
             self.interpolate_data_to_model_output = InterpolateGrid1D(
                 input_grid=interpolate["input_grid"],
                 output_grid=interpolate["output_grid"],
-                input_grid_index=interpolate["output_index"], #for the model
-                output_grid_index=output_index,  #for the data
-            ).requires_grad_(False)
+                input_grid_index=interpolate["output_index"],  # for the model
+                output_grid_index=output_index,  # for the data
+            ).requires_grad_(do_optimize)
 
             self.interpolate_model_to_data_output = InterpolateGrid1D(
                 input_grid=interpolate["output_grid"],
                 output_grid=interpolate["input_grid"],
-                input_grid_index=output_index, #for the model
-                output_grid_index=interpolate["output_index"],  #for the data
-            ).requires_grad_(False)
+                input_grid_index=output_index,  # for the model
+                output_grid_index=interpolate["output_index"],  # for the data
+            ).requires_grad_(do_optimize)
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
+
+    def make_output_weights(self, loss_output_weights):
+        w = torch.tensor(loss_output_weights)
+        w *= w.shape[0] / w.sum()
+        self.register_buffer("loss_output_weights", w)
+        return w
 
     def setup_normalize(self, data_stats):
         if isinstance(data_stats, str) and os.path.exists(data_stats):
@@ -134,6 +157,11 @@ class TrainingModel(LightningModule):
                 list(self.hparams.input_index.values())[-1][-1],
                 list(self.hparams.output_index.values())[-1][-1],
             ]
+
+            if self.hparams.interpolate is not None:
+                sizes[-1] = list(self.hparams.interpolate["output_index"].values())[-1][
+                    -1
+                ]
 
             for v in sizes:
                 layers.append(
@@ -157,16 +185,6 @@ class TrainingModel(LightningModule):
             output_norm = self.get_normalization(stats["output_stats"], zero_mean=True)
 
         return input_norm, output_norm
-
-        # for k in vars_to_setup_norm_for:
-        #     # stats[k]["range"] = stats[k]["max"] - stats[k]["min"]
-        #     stats[k]["range"] = torch.maximum(
-        #         stats[k]["max"] - stats[k]["mean"], stats[k]["mean"] - stats[k]["min"]
-        #     )
-        #     stats[k]["std_eff"] = torch.where(
-        #         stats[k]["std"] > 1e-9, stats[k]["std"], stats[k]["range"]
-        #     )
-        #     layers.append(Normalization(stats[k]["mean"], stats[k]["std_eff"]))
 
     def get_predefined_output_normalization(self):
         mean = torch.zeros(self.hparams.model_config["output_size"])
@@ -198,11 +216,26 @@ class TrainingModel(LightningModule):
         return Normalization(mn, std)
 
     def configure_optimizers(self):
+        out = {}
         if self.hparams.optimizer == "adam":
             optim = torch.optim.Adam
         elif self.hparams.optimizer == "lamb":
             optim = torch_optimizer.Lamb
-        return optim(self.parameters(), lr=self.hparams.lr)
+        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr)
+        if self.hparams.lr_schedule is not None:
+            if self.hparams.lr_schedule == "cosine":
+                out["lr_scheduler"] = {
+                    "scheduler": get_cosine_schedule_with_warmup(
+                        out["optimizer"],
+                        int(0.1 * self.trainer.estimated_stepping_batches),
+                        self.trainer.estimated_stepping_batches,
+                    ),
+                    "interval": "step"
+                }
+            else:
+                raise ValueError(f"unknown lr scheduler {self.hparams.lr_schedule}")
+
+        return out
 
     def forward(self, x):
         return self.model(x)
@@ -225,8 +258,8 @@ class TrainingModel(LightningModule):
 
             if self.hparams.interpolate is not None:
                 x = self.interpolate_data_to_model_input(x)
-                y1 = self.interpolate_data_to_model_output(y1)
-                y2 = self.interpolate_data_to_model_output(y2)
+                # y1 = self.interpolate_data_to_model_output(y1)
+                # y2 = self.interpolate_data_to_model_output(y2)
 
             x = self.input_normalize(x)
             x = self.select_input_variables(x)
@@ -241,14 +274,14 @@ class TrainingModel(LightningModule):
                 return [x, y1], y2
             else:
                 # dont use history
-                
+
                 return x, y2
 
         else:
 
             if self.hparams.interpolate is not None:
                 x = self.interpolate_data_to_model_input(x)
-                y = self.interpolate_data_to_model_output(y)
+                # y = self.interpolate_data_to_model_output(y)
 
             x = self.input_normalize(x)
             y = self.output_normalize(y)
@@ -272,6 +305,10 @@ class TrainingModel(LightningModule):
             raise ValueError("wrong size of x")
 
         yhat = self(x)
+
+        if self.hparams.interpolate is not None:
+            yhat = self.interpolate_model_to_data_output(yhat)
+
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
 
@@ -322,13 +359,18 @@ class TrainingModel(LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         x, y = self.handle_batch(batch)
-        yhat = self(x)
-        yhat = self.output_normalize(yhat, normalize=False)  # denormalize
 
-        if self.hparams.interpolate is not None:
-            yhat = self.interpolate_model_to_data_output(yhat)
-        
-        return yhat.cpu()
+        if self.hparams.predict_hidden_states:
+            y, h = self.model(x, return_hidden_state=True)
+            return h.cpu()
+        else:
+            yhat = self(x)
+            yhat = self.output_normalize(yhat, normalize=False)  # denormalize
+
+            if self.hparams.interpolate is not None:
+                yhat = self.interpolate_model_to_data_output(yhat)
+
+            return yhat.cpu()
 
 
 class FcnBaseline(torch.nn.Module):
@@ -367,6 +409,114 @@ class FcnBaseline(torch.nn.Module):
         input_layer = make_layer(self.input_size, self.hidden_size)
         intermediate_layers = [
             make_layer(self.hidden_size, self.hidden_size)
+            for _ in range(self.num_layers - 2)
+        ]
+        output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+        layers = [input_layer] + intermediate_layers + [output_layer]
+        return torch.nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class EncoderDecoder(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        bottleneck_dim: int = 32,
+        model_type=None,
+    ):
+        super().__init__()
+
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.bottleneck_dim = bottleneck_dim
+        self.scale = 8
+
+        encoder_layers = ceil(self.num_layers / 2)
+        decoder_layers = self.num_layers - encoder_layers
+
+        self.encoder = FcnBaseline(
+            hidden_size=hidden_size,
+            num_layers=encoder_layers,
+            input_size=input_size,
+            output_size=bottleneck_dim,
+            dropout=dropout,
+            leaky_relu=leaky_relu,
+        )
+
+        self.decoder = FcnBaseline(
+            hidden_size=hidden_size,
+            num_layers=decoder_layers,
+            input_size=bottleneck_dim,
+            output_size=output_size,
+            dropout=dropout,
+            leaky_relu=leaky_relu,
+        )
+
+    def forward(self, x, return_hidden_state=False):
+        b = self.encoder(x)
+
+        if self.scale > 1 and not self.training:
+            b = unflatten_tensor(b)
+            s = self.scale
+            b = F.interpolate(b, scale_factor=[1 / s, 1 / s], mode="nearest")
+            b = F.interpolate(b, scale_factor=[s, s], mode="bilinear")
+            b = flatten_tensor(b)
+
+        y = self.decoder(b)
+        if return_hidden_state:
+            return y, b
+        else:
+            return y
+
+
+class ResDNN(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        model_type=None,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.model = self.make_model()
+
+    def make_model(self):
+        if self.num_layers == 1:
+            return torch.nn.Linear(self.input_size, self.output_size)
+
+        def make_layer(ins, outs):
+            layer = torch.nn.Sequential(
+                torch.nn.Linear(ins, outs),
+                # torch.nn.BatchNorm1d(outs),
+                # torch.nn.Dropout(self.dropout),
+                torch.nn.LeakyReLU(self.leaky_relu),
+            )
+
+            return layer
+
+        input_layer = make_layer(self.input_size, self.hidden_size)
+        intermediate_layers = [
+            ResDNNLayer(self.hidden_size, self.leaky_relu, self.dropout)
             for _ in range(self.num_layers - 2)
         ]
         output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
@@ -584,6 +734,97 @@ class ConvNet1D(torch.nn.Module):
         xout = torch.cat(xout, dim=1)
 
         return xout
+
+
+class TransformerModel(torch.nn.Module):
+    def __init__(
+        self,
+        num_layers: int = 4,
+        hidden_size: int = 128,
+        nhead: int = 4,
+        input_index=None,
+        output_index=None,
+        model_type=None,
+        **other,
+    ):
+        super().__init__()
+
+        self.hidden_size = hidden_size
+        # self.input_size = input_size
+        # self.output_size = output_size= ou
+        self.input_index = input_index
+        self.output_index = output_index
+        self.num_layers = num_layers
+        self.set_up_dims()
+
+        self.input_encoder = torch.nn.Linear(self.input_size, self.hidden_size)
+        self.position_encoder = torch.nn.Embedding(self.num_levels, self.hidden_size)
+        encoder_layer = torch.nn.TransformerEncoderLayer(
+            self.hidden_size, nhead=nhead, batch_first=True
+        )
+        layer_norm = torch.nn.LayerNorm(self.hidden_size)
+        self.transformer = torch.nn.TransformerEncoder(
+            encoder_layer, num_layers, layer_norm
+        )
+        self.output_layer = torch.nn.Linear(hidden_size, self.output_size)
+
+        if other:
+            logger.info(f"unknown kwargs {other}")
+
+    def set_up_dims(self):
+        self.num_levels = max([e - s for s, e in self.input_index.values()])
+        self.input_size = len(self.input_index)
+        self.output_size = len(self.output_index)
+
+    def flatten(self, x, kind):
+
+        if kind == "input":
+            index_dict = self.input_index
+        elif kind == "output":
+            index_dict = self.output_index
+
+        xout = []
+        # batch x vars
+        for i, (k, v) in enumerate(index_dict.items()):
+            s, e = v
+            if e - s == 1:  # scalar expand
+                xout.append(x[:, :, i].mean(1, keepdim=True))
+            else:  # per level
+                xout.append(x[:, :, i])
+
+        return torch.cat(xout, dim=-1)
+
+    def arange_spatially(self, x, kind):
+
+        if kind == "input":
+            index_dict = self.input_index
+        elif kind == "output":
+            index_dict = self.output_index
+
+        # batch x levels x channels or vars
+        xout = []
+
+        for k, v in index_dict.items():
+            s, e = v
+            if e - s == 1:  # scalar expand
+                xout.append(x[:, s:e, None].expand(-1, self.num_levels, -1))
+            else:  # per level
+                xout.append(x[:, s:e, None])
+
+        xout = torch.cat(xout, dim=-1)
+
+        return xout
+
+    def forward(self, x):
+        x = self.arange_spatially(x, "input")
+        p = torch.arange(x.shape[1]).to(x.device)
+        pos_embedding = self.position_encoder(p)[None, ...]
+        input_embedding = self.input_encoder(x)
+        x = pos_embedding + input_embedding
+        x = self.transformer(x)
+        y = self.output_layer(x)
+        y = self.flatten(y, "output")
+        return y
 
 
 class ConvNet1x1(torch.nn.Module):

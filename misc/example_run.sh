@@ -1,0 +1,1 @@
+python run.py --mode "train,val,test" --gpu 3 --max_epochs 10

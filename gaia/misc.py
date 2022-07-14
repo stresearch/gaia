@@ -1,4 +1,3 @@
-from sympy import maximum
 import torch
 import tqdm.auto as tqdm
 import plotly.express as px

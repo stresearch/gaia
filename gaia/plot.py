@@ -324,6 +324,14 @@ levels26 = [
 ]
 
 
+def get_levels(dataset):
+    if dataset == "cam4":
+        return levels26
+
+    else:
+        return levels
+
+
 def get_land_polies():
     polys = [
         np.array(p[0])

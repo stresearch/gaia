@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import json
 import os
+from cv2 import log
 
 from sympy import interpolate
 from gaia.callbacks import WriteGraph
@@ -18,11 +19,13 @@ import glob
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
-from gaia.plot import levels26, levels
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from gaia.plot import levels26, levels, get_levels
 import yaml
 
 from gaia import get_logger
+# from gaia.config import Config
+from gaia.config import Config
 
 logger = get_logger(__name__)
 
@@ -40,7 +43,7 @@ def get_checkpoint_file(file):
             raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
-def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-13):
+def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-13, levels = None):
 
     model_params["model_config"].update(
         {
@@ -58,6 +61,7 @@ def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-1
     )
 
     if mean_thres > 0:
+        ### ignore outputs with very small numbers
         ignore_outputs = (
             dataset_dict["stats"]["output_stats"]["mean"].abs() < mean_thres
         )
@@ -65,58 +69,23 @@ def update_model_params_from_dataset(dataset_dict, model_params, mean_thres=1e-1
         loss_output_weights[ignore_outputs] = 0.0
         logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
+        if levels:
+            level_weights = torch.tensor([0] + levels).diff()
+            temp = []
+            for o,(s,e) in dataset_dict["output_index"].items():
+                if e-s > 1:
+                    temp.append(level_weights)
+                else:
+                    temp.append(torch.ones(1)*level_weights.mean())
+
+            level_weights = torch.cat(temp)
+
+            loss_output_weights = level_weights*loss_output_weights
+
+
         model_params["loss_output_weights"] = loss_output_weights.tolist()
 
-
-def get_train_val_test_split(files, interleave=False, seperate_val_set=False):
-    raise DeprecationWarning
-    if not interleave:
-        # use last 10% for test
-        assert seperate_val_set
-        N = int(len(files) * 0.1)
-        train_files = files[: -N * 2]
-        val_files = files[-N * 2 : -N]
-        test_files = files[-N:]
-        return train_files, val_files, test_files
-    else:
-        train_files = []
-        test_files = []
-        if seperate_val_set:
-            val_files = []
-            for i, f in enumerate(files):
-                day_mod_30 = i % 30
-                if day_mod_30 >= 27:
-                    test_files.append(f)
-                # elif (day_mod_30 < 13) & (day_mod_30 >= 10):
-                #     val_files.append(f)
-                else:
-                    train_files.append(f)
-
-            N = len(test_files)
-
-            from random import shuffle
-
-            shuffle(train_files)
-
-            val_files = train_files[:N]
-            train_files = train_files[N:]
-
-            logger.warning("overwriting with predefined split")
-
-            temp = json.load(open("/ssddg1/gaia/cache/files_split.json"))
-            train_files = temp["train"]
-            val_files = temp["val"]
-
-            return train_files, val_files, test_files
-        else:
-            # last 3 days of every 30 days
-            for i, f in enumerate(files):
-                if i % 30 < 27:
-                    train_files.append(f)
-                else:
-                    test_files.append(f)
-
-            return train_files, test_files, test_files
+    
 
 
 def default_dataset_params(
@@ -124,7 +93,7 @@ def default_dataset_params(
     base="/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
     mean_thres=1e-13,
 ):
-
+    logger.warn("depreciated")
     var_index_file = base + "_var_index.pt"
 
     return dict(
@@ -152,64 +121,13 @@ def default_dataset_params(
         mean_thres=mean_thres,
     )
 
-
-def default_dataset_params_v1(
-    batch_size=24 * 96 * 144,
-    subsample_factor=12,
-    flatten=True,
-    interleave=True,
-    seperate_val_set=False,
-    inputs=["T", "Q", "RELHUM", "U", "V"],
-    outputs=["PTEQ", "PTTEND", "PRECT"],
-):
-    files = sorted(glob.glob("/ssddg1/gaia/cesm106_cam4/*.nc"))
-    train_files, val_files, test_files = get_train_val_test_split(
-        files, interleave=interleave, seperate_val_set=seperate_val_set
-    )
-
-    return dict(
-        train=dict(
-            files=train_files,
-            subsample_factor=subsample_factor,
-            batch_size=batch_size,
-            shuffle=True,
-            in_memory=True,
-            flatten=flatten,
-            compute_stats=True,
-            inputs=inputs,
-            outputs=outputs,
-        ),
-        val=dict(
-            files=val_files,
-            subsample_factor=subsample_factor,
-            batch_size=batch_size,
-            shuffle=True,
-            in_memory=True,
-            flatten=flatten,
-            compute_stats=False,
-            inputs=inputs,
-            outputs=outputs,
-        ),
-        test=dict(
-            files=test_files,
-            subsample_factor=1,
-            batch_size=batch_size,
-            shuffle=False,
-            in_memory=True,
-            flatten=False,
-            compute_stats=False,
-            inputs=inputs,
-            outputs=outputs,
-        ),
-    )
-
-
 def default_model_params(**kwargs):
+    logger.exception(DeprecationWarning)
     d = dict(
         lr=1e-3,
         optimizer="adam",
         model_config={
-            "model_type": "fcn_history",
+            "model_type": "fcn",
             "num_layers": 7,
         },
     )
@@ -227,6 +145,7 @@ def load_hparams_file(model_dir):
 
 
 def default_trainer_params(**kwargs):
+    logger.exception(DeprecationWarning)
     d = dict(precision=16,max_epochs=200)
     d.update(kwargs)
     return d
@@ -243,10 +162,10 @@ def make_pretty_for_log(d, max_char=100):
 
 def main(
     mode="train",
-    trainer_params=default_trainer_params(),
-    dataset_params=default_dataset_params(),
-    model_params=default_model_params(),
-    seed=None,
+    trainer_params=Config.set_trainer_params(),
+    dataset_params=Config.set_dataset_params(),
+    model_params=Config.set_model_params(),
+    seed=True,
     interpolation_params = None
 ):
     if seed:
@@ -258,8 +177,6 @@ def main(
     logger.info(f"dataset_params: \n{make_pretty_for_log(dataset_params)}")
     logger.info(f"model_params: \n{make_pretty_for_log(model_params)}")
 
-    mode = mode.split(",")
-
     model_dir = None
     trainer = None
     val_dataloader = None
@@ -268,13 +185,13 @@ def main(
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
         val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
 
-        # val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
-        # test_dataset, test_dataloader =     get_dataset(dataset_params["test"])
-
         mean_thres = dataset_params["mean_thres"]
 
+        #TODO fix
+        dataset_name = "cam4" if "cam4" in dataset_params["train"]["dataset_file"] else "spcam"
+
         update_model_params_from_dataset(
-            train_dataset, model_params, mean_thres=mean_thres
+            train_dataset, model_params, mean_thres=mean_thres, levels = get_levels(dataset_name)
         )
 
        
@@ -284,6 +201,56 @@ def main(
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
         # write_graph = WriteGraph()
+
+        trainer = pl.Trainer(
+            callbacks=[checkpoint_callback, LearningRateMonitor()],
+            log_every_n_steps=max(1, len(train_dataloader) // 100),
+            **trainer_params,
+        )
+
+        if model_params.get("ckpt", None) is not None:
+            logger.info(f"loading existing ckpt {model_params}")
+            ckpt = get_checkpoint_file(model_params["ckpt"])
+        else:
+            ckpt = None
+
+        trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
+        model_dir = trainer.log_dir
+
+    if "finetune" in mode:
+        #assuming we'll fine-tune on a different dataset
+        if model_params.get("pretrained", None) is not None:
+            logger.info(f"loading pretrained {model_params}")
+            pretrained = get_checkpoint_file(model_params["pretrained"])
+        else:
+            raise ValueError("need to specify pretrained to fine-tune")
+
+        mean_thres = dataset_params["mean_thres"]
+
+        train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
+        val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+
+        ## update interpolation params
+        interpolation_params = dict()
+        interpolation_params["input_grid"] = levels
+        interpolation_params["output_grid"] = levels26
+        interpolation_params["optimize"]=False
+        interpolation_params["model_config"] = dict()
+
+        update_model_params_from_dataset(
+            train_dataset, interpolation_params, mean_thres=mean_thres
+        )
+
+        model = TrainingModel.load_from_checkpoint(pretrained, strict = False,  **{"interpolate": interpolation_params})
+
+        # update output normalizaton
+        model.add_module("output_normalize", model.get_normalization(interpolation_params["data_stats"]["output_stats"], zero_mean=True))
+
+        # update output weights
+        model.make_output_weights(interpolation_params["loss_output_weights"])
+        model.hparams.loss_output_weights = interpolation_params["loss_output_weights"]
+
+        checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
         trainer = pl.Trainer(
             callbacks=[checkpoint_callback],
@@ -299,6 +266,8 @@ def main(
 
         trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
         model_dir = trainer.log_dir
+
+
 
     if "val" in mode:
         if model_dir is None:
@@ -325,6 +294,8 @@ def main(
                 **trainer_params,
             )
 
+
+
         validation_score = trainer.validate(model, val_dataloader)
         json.dump(
             validation_score,
@@ -339,11 +310,15 @@ def main(
 
         model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
 
+        # model.model.scale = 16
+
         #bug
         if "var_index_file" not in model.hparams.dataset_params["test"]:
             logger.info("adding var index file")
             model.hparams.dataset_params["test"]["var_index_file"] = model.hparams.dataset_params["test"]["dataset_file"].replace("_test.pt", "_var_index.pt")
 
+
+        # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
         test_dataset, test_dataloader = get_dataset(**model.hparams.dataset_params["test"])
 
@@ -355,7 +330,7 @@ def main(
 
         test_results = trainer.test(model, dataloaders=test_dataloader)
         # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(model_dir, "test_results.json")
+        path_to_save = os.path.join(model_dir, f"test_results.json")
         json.dump(test_results, open(path_to_save, "w"))
 
     if "predict" in mode:
@@ -368,7 +343,7 @@ def main(
         model = TrainingModel.load_from_checkpoint(
             get_checkpoint_file(model_dir),
             strict=False,
-            **{"interpolate": interpolation_params},
+            **{"interpolate": interpolation_params, "predict_hidden_states" : False},
         )
 
         ### loading a different dataset
@@ -411,9 +386,9 @@ def main(
         logger.info("processing results")
 
         other_predictions = None
-        if "cam4" in model_dir:
-            other_predictions = "lightning_logs_compare_models/spcam_nn/predictions_on_cam4.pt"
-        else:
-            other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
+        # if "cam4" in model_dir:
+        #     other_predictions = "lightning_logs_compare_models/spcam_nn/predictions_on_cam4.pt"
+        # else:
+        #     other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)

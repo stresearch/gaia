@@ -71,7 +71,7 @@ To perform training, we use a machine with at least a single GPU and 64GBs of RA
 To run default training:
 ```bash
 python run_omega.py \
-mode='train,val,test,predict' \
+general_params.mode='train,val,test,predict' \
 trainer_params.max_epochs=200 \
 trainer_params.gpus=[0] \
 model_params.model_type="fcn" \
@@ -81,7 +81,7 @@ dataset_params.dataset='cam4' \
 
 ## Parameters
 
-For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
+For default parameters consult `gaia.config.Config` class. There are four groups of parameters: `general_params, trainer_params, dataset_params, model_params` .
 
 Parameters can be specified by 
 - directly passing nested dictionaries for each
@@ -115,6 +115,9 @@ model_params =
 
 training_params = 
 {'precision': 16, 'max_epochs': 200, gpus=[0]}
+
+general_params = 
+{'mode': 'train,val,test', 'seed': True, 'interpolation_params': None}
 
 ```
 
@@ -189,6 +192,7 @@ To use a model saved under saved under `lightning_logs/version_XX` pass the chec
 
 ```shell
 python run_omega.py \
+general_params.mode=test \
 model_params.ckpt=lightning_logs/version_XX
 ```
 

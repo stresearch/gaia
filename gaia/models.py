@@ -1,14 +1,14 @@
-from asyncio.log import logger
 from collections import OrderedDict
 from math import ceil
 from turtle import forward
-from typing import List
+from typing import List, ValuesView
 from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (
+    Conv2dDS,
     InterpolateGrid1D,
     Normalization,
     ResDNNLayer,
@@ -19,7 +19,8 @@ import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
-
+from gaia import get_logger
+logger = get_logger(__name__)
 
 class TrainingModel(LightningModule):
     def __init__(
@@ -76,8 +77,8 @@ class TrainingModel(LightningModule):
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
-        elif model_type == "conv":
-            self.model = ConvNet1x1(**model_config)
+        elif model_type == "conv2d":
+            self.model = ConvNet2D(**model_config)
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
         elif model_type == "conv1d":
@@ -309,6 +310,8 @@ class TrainingModel(LightningModule):
         if self.hparams.interpolate is not None:
             yhat = self.interpolate_model_to_data_output(yhat)
 
+        
+
         loss = OrderedDict()
         mse = F.mse_loss(y, yhat, reduction="none")
 
@@ -339,8 +342,17 @@ class TrainingModel(LightningModule):
                         loss_name = f"skill_ave_trunc_{k}_{i:02}"
                         loss[loss_name] = skill[i]
 
+
         if self.hparams.loss_output_weights is not None:
-            mse = mse * self.loss_output_weights[None, :]
+
+            num_dims = len(mse.shape)
+            if num_dims == 4:
+                mse = mse * self.loss_output_weights[None,:, None, None]
+            elif num_dims == 2:
+                mse = mse * self.loss_output_weights[None,:]
+            else:
+                raise ValueError("wrong number of dims in mse")
+    
 
         loss["mse"] = mse.mean()
         for k, v in loss.items():
@@ -827,7 +839,7 @@ class TransformerModel(torch.nn.Module):
         return y
 
 
-class ConvNet1x1(torch.nn.Module):
+class ConvNet2D(torch.nn.Module):
     def __init__(
         self,
         input_size=26 * 2,
@@ -836,6 +848,8 @@ class ConvNet1x1(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        kernel_size: int = 3,
+        conv_type: str = "conv2d",
         model_type=None,
     ):
         super().__init__()
@@ -846,13 +860,21 @@ class ConvNet1x1(torch.nn.Module):
         self.dropout = dropout
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
-
+        self.kernel_size = kernel_size
+        self.conv_type = conv_type
         self.model = self.make_model()
 
     def make_model(self):
+        if self.conv_type == 'conv2d':
+            conv = torch.nn.Conv2d
+        elif self.conv_type == "conv2d_ds":
+            conv = Conv2dDS
+        else:
+            raise ValueError(f"unknown {self.conv_typ}")
         def make_layer(ins, outs):
+            
             layer = torch.nn.Sequential(
-                torch.nn.Conv2d(ins, outs, kernel_size=1, bias=False),
+                conv(ins, outs, kernel_size=self.kernel_size, bias=True, padding = "same"),
                 torch.nn.BatchNorm2d(outs),
                 torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
@@ -864,9 +886,10 @@ class ConvNet1x1(torch.nn.Module):
             make_layer(self.hidden_size, self.hidden_size)
             for _ in range(self.num_layers - 2)
         ]
-        output_layer = torch.nn.Conv2d(
-            self.hidden_size, self.output_size, kernel_size=1, bias=True
+        output_layer = conv(
+            self.hidden_size, self.output_size, kernel_size=self.kernel_size, padding = "same", bias=True
         )
+
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 

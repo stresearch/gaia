@@ -91,3 +91,15 @@ class ResDNNLayer(torch.nn.Module):
         y = self.layer2(y)
         y = y + x
         return x
+
+
+class Conv2dDS(torch.nn.Module):
+    def __init__(self, nin, nout, kernel_size=3, kernels_per_layer=1, bias = True, padding = "same" ): 
+        super().__init__() 
+        self.depthwise = torch.nn.Conv2d(nin, nin * kernels_per_layer, kernel_size=kernel_size, padding=padding, groups=nin, bias = bias) 
+        self.pointwise = torch.nn.Conv2d(nin * kernels_per_layer, nout, kernel_size=1, bias = bias) 
+  
+    def forward(self, x): 
+        out = self.depthwise(x) 
+        out = self.pointwise(out) 
+        return out

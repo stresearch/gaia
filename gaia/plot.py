@@ -325,9 +325,8 @@ levels26 = [
 
 
 def get_levels(dataset):
-    if dataset == "cam4":
+    if "cam4" in dataset:
         return levels26
-
     else:
         return levels
 
@@ -341,6 +340,7 @@ def get_land_polies():
     ]
 
     return polys
+
 
 def get_land_outline():
     polys = [
@@ -520,7 +520,3 @@ def plot_results(model_dir):
         + [("params", params)]
     )
     combined_plot.save(os.path.join(model_dir, "plots_naive.html"))
-
-
-
-

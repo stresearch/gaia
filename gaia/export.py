@@ -5,6 +5,8 @@ from gaia.models import TrainingModel
 from gaia.training import get_checkpoint_file
 import os
 from gaia import get_logger
+import yaml
+
 
 logger = get_logger(__name__)
 
@@ -130,3 +132,12 @@ def export(model_dir, export_name, inputs=None, outputs=None):
         logger.info(out_traced[0].shape)
 
         logger.info(out_traced[0])
+
+    if inputs is None:
+        inputs = list(model.hparams.input_index.keys())
+    if outputs is None:
+        outputs = list(model.hparams.output_index.keys())
+
+    open(os.path.join(model_dir, export_name.replace(".pt","_io.yaml"), "w").write(
+        yaml.dump(dict(inputs=inputs, outputs=outputs), indent=2)
+    )

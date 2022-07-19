@@ -391,8 +391,8 @@ def unflatten_tensor(v):
     return v
 
 
-def get_variable_index(dataset, variable_names, channel_dim = 1):
-    out = OrderedDict()
+def get_variable_index(dataset, variable_names, channel_dim = 1, return_dict = True):
+    out = []
     i = 0
     
     for n in variable_names:
@@ -404,8 +404,11 @@ def get_variable_index(dataset, variable_names, channel_dim = 1):
         else:
             raise ValueError("all variables must have at least 3 dims")
         j = i + num_channels
-        out[n] = [i, j]
+        out.append((n,[i, j]))
         i = j
+
+    if return_dict:
+        out = OrderedDict(out)
 
     return out
 
@@ -561,11 +564,11 @@ class NCDataConstructor:
             )
 
     def get_input_index(self, dataset):
-        if self.input_index is not None:
+        if self.input_index is None:
             self.input_index = self.get_variable_index(dataset, self.inputs)
 
     def get_output_index(self, dataset):
-        if self.output_index is not None:
+        if self.output_index is None:
             self.output_index = self.get_variable_index(dataset, self.outputs)
 
     def get_variable_index(self, dataset, variable_names):

@@ -88,6 +88,7 @@ class Config():
         if base is None:
             dataset_paths = {
                 "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
+                "cam4_v2": "/ssddg1/gaia/cam4_v2/cam4-famip-30m-timestep-second-upload",
                 "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"

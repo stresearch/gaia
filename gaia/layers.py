@@ -1,10 +1,16 @@
-from turtle import forward
 import torch
-
+from gaia import get_logger
+logger = get_logger(__name__)
 
 class Normalization(torch.nn.Module):
     def __init__(self, mean, std):
         super().__init__()
+        z = std == 0
+
+        if z.any():
+            logger.warn(f"found zero {z.sum()} std values, replacing with ones")
+            std[z] = 1.
+
         self.register_buffer("mean", mean[None, :, None, None])
         self.register_buffer("std", std[None, :, None, None])
 

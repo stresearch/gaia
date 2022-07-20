@@ -8,6 +8,15 @@ To visualize how much each input perturbs every output, we l2 normalize each row
 
 ## CAM4
 
-[*Click on figure for interactive visualization*](jacobian.html)
 
+### Normalized Jacobian of Temperature and Humidity Tendencies
+
+[*Click on figure for interactive visualization*](jacobian_cam4_norm.html)
+[![](jacobian_cam4_norm.png)](jacobian_cam4_norm.html)
+
+**Reference of CRM from Kuang 2012**
+
+### l2 Normalized Jacobian of All Inputs
+
+[*Click on figure for interactive visualization*](jacobian.html)
 [![](jacobian.png)](jacobian.html)

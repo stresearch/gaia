@@ -11,10 +11,13 @@ To visualize how much each input perturbs every output, we l2 normalize each row
 
 ### Normalized Jacobian of Temperature and Humidity Tendencies
 
-[*Click on figure for interactive visualization*](jacobian_cam4_norm.html)
-[![](jacobian_cam4_norm.png)](jacobian_cam4_norm.html)
+[*Click on figure for interactive visualization*](jacobian_norm_cam4.html)
+[![](jacobian_norm_cam4.png)](jacobian_norm_cam4.html)
 
 **Reference of CRM from Kuang 2012**
+
+[*By different lats*](jacobian_norm_cam4_by_lats.html)
+
 
 ### l2 Normalized Jacobian of All Inputs
 

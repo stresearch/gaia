@@ -4,7 +4,7 @@ We compute linearization of the NN surrigate f(x) = y, to understand sensitivity
 
 Linearization of f(x`) = Ax` + b, can be computed by computing the gradiant grad f(x) around x`. Since f(x) is vector valued we compute a jacobian: A = J_x(f(x)). 
 
-To visualize how much each input perturbs every output, we l2 normalize each row of J. The following figure breaks up J by different output and input groups. This is computed around the mean input.
+
 
 ## CAM4
 
@@ -21,6 +21,8 @@ Normalized Jacobian CAM4 NN  |  Reference from CRM (Fig 8. Kuang 2021)
 
 
 ### l2 Normalized Jacobian of All Inputs
+
+To visualize how much each input perturbs every output, we l2 normalize each row of J. The following figure breaks up J by different output and input groups. This is computed around the mean input.
 
 [*Click on figure for interactive visualization*](jacobian.html)
 [![](jacobian.png)](jacobian.html)

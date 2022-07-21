@@ -14,4 +14,4 @@ There are two variations:
 | *conv2d_k* | 2 dimensional seperable depthwise conv net, lat/lots = 2d spatial dimensions, variables stacked as channels, k = kernel size |  
 
 
-![](skill_vs_nn_arch.png)](skill_vs_nn_arch.html)
+[![](skill_vs_nn_arch.png)](skill_vs_nn_arch.html)

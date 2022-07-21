@@ -23,6 +23,10 @@ Jacobian CAM4 FCN NN  |  Reference from CRM (Fig 8. Kuang 2012)
 [![](jacobian_proper_scale.png)](jacobian_proper_scale.html) | [![](ref_jacobian.png)](ref_jacobian.png)
 
 
+Jacobian SPCAM FCN NN  |  Reference from CRM (Fig 8. Kuang 2012)
+:-------------------------:  |      :-------------------------:
+[![](jacobian_proper_scale_spcam.png)](jacobian_proper_scale_spcam.html) | [![](ref_jacobian.png)](ref_jacobian.png)
+
 <!-- [*By different lats*](jacobian_norm_cam4_by_lats.html) -->
 
 

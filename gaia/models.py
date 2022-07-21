@@ -82,7 +82,7 @@ class TrainingModel(LightningModule):
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
         elif model_type == "conv1d":
-            self.model = ConvNet1D(**model_config)
+            self.model = ConvNet1D(input_index=input_index, output_index=output_index, **model_config)
         elif model_type == "resdnn":
             self.model = ResDNN(**model_config)
         elif model_type == "encoderdecoder":
@@ -452,7 +452,7 @@ class EncoderDecoder(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.bottleneck_dim = bottleneck_dim
-        self.scale = 8
+        self.scale = 1
 
         encoder_layers = ceil(self.num_layers / 2)
         decoder_layers = self.num_layers - encoder_layers
@@ -519,8 +519,8 @@ class ResDNN(torch.nn.Module):
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
                 torch.nn.Linear(ins, outs),
-                # torch.nn.BatchNorm1d(outs),
-                # torch.nn.Dropout(self.dropout),
+                torch.nn.BatchNorm1d(outs),
+                torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
             )
 

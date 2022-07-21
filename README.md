@@ -4,19 +4,19 @@ This repository contains code for training and running climate neural network su
 
  ***Warning:** This is an active research project. The code base is constantly evolving as new features are being added and old ones are depreciated.*
 
-- [Installation](#installation)
-- [Data Preprocessing](#data-preprocessing)
-- [Training](#training)
-  - [Parameters](#parameters)
-- [Inference](#inference)
 
 >This work is part of the DARPA ACTME (AI-assisted Climate Tipping-point Modeling) AIE Program - https://github.com/ACTM-darpa/info-and-links
 
 [![](docs/sections/overview/overview_screenshot.png)](https://stresearch.github.io/gaia/)
 
+- [Installation](#installation)
+- [Data Preprocessing](#data-preprocessing)
+- [Training](#training)
+  - [Parameters](#parameters)
+- [Inference](#inference)
+- [Export Model for Integration](#export-model-for-integration)
 
-
-# Installation
+## Installation
 
 Install requirments: 
 
@@ -25,7 +25,7 @@ git clone https://github.com/stresearch/gaia
 pip install -r requirements
 ```
 
-# Data Preprocessing
+## Data Preprocessing
 
 We work with outputs from two climate models: CAM4 and SPCAM. 
 - We assume raw data resides in an S3 bucket with one file per day in the `NCDF4` format. 
@@ -64,7 +64,7 @@ Copy to machine where you want to train the model.
 
 For more details see [`gaia.data` module](https://github.com/stresearch/gaia/blob/c0268fa86aac53b04626ba77ebba1c76293f7557/gaia/data.py#L454)
 
-# Training
+## Training
 
 To perform training, we use a machine with at least a single GPU and 64GBs of RAM (to load the full dataset into memory)
 
@@ -79,7 +79,7 @@ dataset_params.dataset='cam4' \
 
 ```
 
-## Parameters
+### Parameters
 
 For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
 
@@ -183,7 +183,7 @@ model_config = {
 
 After training the model is saved under `lightning_logs/version_XX` . All the parameters are also saved under `lightning_logs/version_XX/hparams.yaml`
 
-# Inference
+## Inference
 
 To use a model saved under saved under `lightning_logs/version_XX` pass the checkpoint path to `ckpt` argument and all the configuration will automatically load
 
@@ -192,3 +192,16 @@ python run_omega.py \
 model_params.ckpt=lightning_logs/version_XX
 ```
 
+## Export Model for Integration
+
+```python
+from gaia.export import export
+
+model_dir = "lightning_logs/version_3"
+export_name = "export_model_cam4.pt"
+
+inputs = None
+outputs = "PTEQ,PTTEND,DCQ,DTCOND,QRS,QRL,CLOUD,CONCLD,FSNS,FLNS,FSNT,FLNT,FSDS,FLDS,SRFRAD,SOLL,SOLS,SOLLD,SOLSD,PSL,PRECT,PRECC,PRECL,PRECSC,PRECSL".split(",")
+
+export(model_dir, export_name, inputs=inputs, outputs=outputs)
+```

@@ -138,6 +138,6 @@ def export(model_dir, export_name, inputs=None, outputs=None):
     if outputs is None:
         outputs = list(model.hparams.output_index.keys())
 
-    open(os.path.join(model_dir, export_name.replace(".pt", "_io.yaml"), "w")).write(
+    open(os.path.join(model_dir, export_name.replace(".pt", "_io.yaml")), "w").write(
         yaml.dump(dict(inputs=inputs, outputs=outputs), indent=2)
     )

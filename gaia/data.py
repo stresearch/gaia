@@ -457,9 +457,15 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
-        train_years = 2,
+        train_years = 7,
+        subsample_factor = 4,
         cache = ".",
-        workers = 1
+        workers = 1, 
+        inputs = "Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
+                ","
+            ),
+        outputs = "PRECT,PRECC,PTEQ,PTTEND".split(","),
+        time_steps = 0
     ):
         aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
         aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
@@ -476,10 +482,14 @@ class NCDataConstructor:
 
         logger.info(f"found {len(files)} files")
 
-        if split == "train":
-            files = files[: 365 * train_years]
+        if split == "test":
+            start_index = train_years*365
+            end_index = (1+train_years)*365
+            files = files[start_index:end_index]
         else:
-            files = files[365 * train_years :]
+            start_index = 0
+            end_index = train_years*365
+            files = files[start_index:end_index]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
@@ -487,17 +497,15 @@ class NCDataConstructor:
         )
 
         data_constructor = cls(
-            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
-                ","
-            ),
-            outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten= False,
-            shuffle = False,
-            subsample_factor=4,
+            inputs=inputs,
+            outputs=outputs,
+            flatten = split == "train",
+            shuffle = split == "train",
+            subsample_factor=subsample_factor,
             compute_stats=True,
             cache = os.path.join(cache,split),
             s3_client_kwargs=s3_client_kwargs,
-            time_steps=0,
+            time_steps=time_steps,
         )
 
 
@@ -561,11 +569,11 @@ class NCDataConstructor:
             )
 
     def get_input_index(self, dataset):
-        if self.input_index is not None:
+        if self.input_index is None:
             self.input_index = self.get_variable_index(dataset, self.inputs)
 
     def get_output_index(self, dataset):
-        if self.output_index is not None:
+        if self.output_index is None:
             self.output_index = self.get_variable_index(dataset, self.outputs)
 
     def get_variable_index(self, dataset, variable_names):

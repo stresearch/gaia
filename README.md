@@ -90,6 +90,8 @@ Parameters can be specified by
 
 Example configs:
 
+#### Dataset Params
+
 ```python
 dataset_params = 
 {'test': {'batch_size': 138240,
@@ -107,16 +109,25 @@ dataset_params =
   'flatten': False,
   'shuffle': False,
   'var_index_file': '/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4_var_index.pt'}}
+```
 
-model_params = 
-{'lr': 0.001,
- 'optimizer': 'adam',
- 'model_config': {'model_type': 'fcn', 'num_layers': 7}}
+#### Training Params
 
+```python
 training_params = 
 {'precision': 16, 'max_epochs': 200, gpus=[0]}
 
 ```
+
+#### Model Params
+
+```python
+model_params = 
+{'lr': 0.001,
+ 'optimizer': 'adam',
+ 'model_config': {'model_type': 'fcn', 'num_layers': 7}}
+ 
+ ```
 
 We support the following types of NN models:
 
@@ -130,6 +141,7 @@ model_config = {
     "dropout": 0.01,
     "leaky_relu": 0.15
 }
+
 ```
 
 fcn_history: baseline MLP with an extra input of memory variables i.e. outputs from previous time step

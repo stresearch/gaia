@@ -214,6 +214,8 @@ model_params.ckpt=lightning_logs/version_XX
 
 ## Export Model for Integration
 
+Export pretrained pytorch model to a torchscript checkpoint to be loaded into the intergrated hybrid model.
+
 ```python
 from gaia.export import export
 

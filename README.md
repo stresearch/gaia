@@ -180,6 +180,26 @@ model_config = {
 }
 ```
 
+transformer: transformer with z level positional encoding
+
+```python
+model_config = {
+            "model_type": "transformer",
+            "num_layers": 3,
+            "hidden_size": 128,
+        }
+```
+
+
+conv2d: 2D seperable depthwise conv net with lat/lons as the spatial dimensions
+```python
+model_config = {
+          "model_type": "conv2d",
+          "num_layers": 7,
+          "hidden_size": 176,
+          "kernel_size": 3,
+      }
+```
 
 After training the model is saved under `lightning_logs/version_XX` . All the parameters are also saved under `lightning_logs/version_XX/hparams.yaml`
 

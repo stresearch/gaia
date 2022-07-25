@@ -90,6 +90,8 @@ Parameters can be specified by
 
 Example configs:
 
+#### Dataset Params
+
 ```python
 dataset_params = 
 {'test': {'batch_size': 138240,
@@ -107,16 +109,25 @@ dataset_params =
   'flatten': False,
   'shuffle': False,
   'var_index_file': '/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4_var_index.pt'}}
+```
 
-model_params = 
-{'lr': 0.001,
- 'optimizer': 'adam',
- 'model_config': {'model_type': 'fcn', 'num_layers': 7}}
+#### Training Params
 
+```python
 training_params = 
 {'precision': 16, 'max_epochs': 200, gpus=[0]}
 
 ```
+
+#### Model Params
+
+```python
+model_params = 
+{'lr': 0.001,
+ 'optimizer': 'adam',
+ 'model_config': {'model_type': 'fcn', 'num_layers': 7}}
+ 
+ ```
 
 We support the following types of NN models:
 
@@ -130,6 +141,7 @@ model_config = {
     "dropout": 0.01,
     "leaky_relu": 0.15
 }
+
 ```
 
 fcn_history: baseline MLP with an extra input of memory variables i.e. outputs from previous time step
@@ -180,6 +192,26 @@ model_config = {
 }
 ```
 
+transformer: transformer with z level positional encoding
+
+```python
+model_config = {
+            "model_type": "transformer",
+            "num_layers": 3,
+            "hidden_size": 128,
+        }
+```
+
+
+conv2d: 2D seperable depthwise conv net with lat/lons as the spatial dimensions
+```python
+model_config = {
+          "model_type": "conv2d",
+          "num_layers": 7,
+          "hidden_size": 176,
+          "kernel_size": 3,
+      }
+```
 
 After training the model is saved under `lightning_logs/version_XX` . All the parameters are also saved under `lightning_logs/version_XX/hparams.yaml`
 
@@ -193,6 +225,8 @@ model_params.ckpt=lightning_logs/version_XX
 ```
 
 ## Export Model for Integration
+
+Export pretrained pytorch model to a torchscript checkpoint to be loaded into the intergrated hybrid model.
 
 ```python
 from gaia.export import export

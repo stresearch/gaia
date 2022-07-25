@@ -937,7 +937,8 @@ def get_dataset(
     batch_size=1024,
     flatten=False,
     shuffle = False,
-    var_index_file = None
+    var_index_file = None,
+    include_index = False,
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -947,16 +948,25 @@ def get_dataset(
 
     dataset_dict.update(var_index)
 
-    del dataset_dict["index"]
+    
 
     if flatten:
         logger.warning("flattening dataset")
         for v in ["x", "y"]:
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
+
+    if not include_index:
+        del dataset_dict["index"]
+
+        tensor_list = [dataset_dict["x"], dataset_dict["y"]]
+
+    else:
+        pass
+
     data_loader = DataLoader(
         FastTensorDataset(
-            dataset_dict["x"], dataset_dict["y"], batch_size=batch_size, shuffle=shuffle
+            *tensor_list, batch_size=batch_size, shuffle=shuffle
         ),
         batch_size=None,
         pin_memory=True,

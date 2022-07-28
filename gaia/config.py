@@ -107,7 +107,13 @@ class Config():
             raise ValueError(f"unknown dataset {dataset}")
 
         var_index_file = base + "_var_index.pt"
+
+        #possibly shared params
+
         batch_size = cli_args.get('dataset_params',{}).get("batch_size",24 * 96 * 144)
+        include_index = cli_args.get('dataset_params',{}).get("include_index",False)
+        subsample = cli_args.get('dataset_params',{}).get("subsample",1)
+        space_filter = cli_args.get('dataset_params',{}).get("space_filter",None)
         
         dataset_params = dict(
             train=dict(
@@ -115,21 +121,30 @@ class Config():
                 batch_size=batch_size,
                 shuffle=True,
                 flatten=False,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=False,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter
             ),
             mean_thres=mean_thres
         )
@@ -211,6 +226,14 @@ def model_type_lookup(model_type):
             "model_type": "transformer",
             "num_layers": 3,
             "hidden_size": 128,
+        }
+    elif model_type == "fcn_with_index":
+        model_config = {
+            "model_type": "fcn_with_index",
+            "num_layers": 7,
+            "hidden_size": 512,
+            "dropout": 0.01,
+            "leaky_relu": 0.15
         }
     else:
         raise ValueError

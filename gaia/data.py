@@ -932,6 +932,28 @@ def get_dataset_v1(
     return dataset_dict, data_loader
 
 
+def unravel_index(flat_index, shape): 
+     # flat_index = operator.index(flat_index) 
+     res = [] 
+  
+     # Short-circuits on zero dim tensors 
+     if shape == torch.Size([]): 
+         return 0 
+  
+     for size in shape[::-1]: 
+         res.append(flat_index % size) 
+         flat_index = flat_index // size 
+        
+    # return torch.cat(res
+  
+     if len(res) == 1: 
+         return res[0] 
+  
+     return res[::-1]
+
+
+
+
 def get_dataset(
     dataset_file,
     batch_size=1024,
@@ -939,6 +961,8 @@ def get_dataset(
     shuffle = False,
     var_index_file = None,
     include_index = False,
+    subsample = 1,
+    space_filter = None
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -956,13 +980,76 @@ def get_dataset(
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
 
-    if not include_index:
+    tensor_list = [dataset_dict["x"], dataset_dict["y"]]
+
+
+    if include_index or (space_filter is not None):
+        #TODO dont hard code this
+        num_ts,num_lats,num_lons = 8,96,144
+        logger.warning(f"using hardcoded expected shape for unraveling the index: {num_ts,num_lats,num_lons}")
+
+        if flatten:
+            
+            # index is flattened
+            # shape = dataset_dict["x"].shape
+            # if len(dataset_dict["x"].shape) == 3:
+            #     samples, timesteps, channels = dataset_dict["x"].shape
+            # else:
+            #     samples, channels = dataset_dict["x"].shape
+
+            num_samples = dataset_dict["index"].shape[0]
+
+            lats = torch.ones(num_samples,1,num_lons)*torch.arange(num_lats)[None,:,None]
+            lons = torch.ones(num_samples,num_lats,1)*torch.arange(num_lons)[None,None,:]
+            index = torch.cat([lats.ravel().long()[:,None], lons.ravel().long()[:,None]],dim=-1)
+        else:
+            index = unravel_index(dataset_dict["index"], shape=[num_ts, num_lats, num_lons])
+            index = torch.cat([i[:,None] for i in index[1:]],dim=-1) #just want lats, lons
+
+        
+    else:
         del dataset_dict["index"]
 
-        tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 
-    else:
-        pass
+    if include_index:
+        tensor_list += [index]
+
+
+    if space_filter is not None:
+        # filter out dataset
+
+        logger.info(f"applying space filter {space_filter}")
+
+        from gaia.plot import lats as lats_vals
+        from gaia.plot import lons as lons_vals
+
+        lats_vals = torch.tensor(lats_vals)
+        lons_vals = torch.tensor(lons_vals)
+
+        mask = torch.ones(len(tensor_list[0])).bool()
+
+        if "lat_bounds" in space_filter:
+            lat_min,lat_max = space_filter["lat_bounds"]
+            temp = lats_vals[index[:,0]]
+            mask = mask & (temp <= lat_max) & (temp>=lat_min)
+
+        if "lon_bounds" in space_filter:
+            lon_min,lon_max = space_filter["lon_bounds"]
+            temp = lons_vals[index[:,1]]
+            mask = mask & (temp <= lon_max) & (temp>=lon_min)
+
+        assert mask.any()
+
+        tensor_list = [t[mask,...] for t in tensor_list]
+
+
+    if subsample>1:
+        tensor_list = [t[::subsample,...] for t in tensor_list]
+        logger.info(f"subsampling by factor of {subsample}")
+
+
+    logger.info(f"data size {len(tensor_list[0])}")
+
 
     data_loader = DataLoader(
         FastTensorDataset(

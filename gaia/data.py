@@ -499,6 +499,11 @@ class NCDataConstructor:
             aws_secret_access_key=aws_secret_access_key,
         )
 
+        if len(outputs) == 0:
+            no_output = True
+            logger.warning("no outputs will be constructed... adding a dummy output")
+            outputs = ["PRECC"]
+
         data_constructor = cls(
             inputs=inputs,
             outputs=outputs,
@@ -535,7 +540,10 @@ class NCDataConstructor:
             index_train = index[mask]
 
             out["x"] = xtrain
-            out["y"] = ytrain
+
+            if not no_output:
+                out["y"] = ytrain
+
             out["index"] = index_train
 
             torch.save(
@@ -551,7 +559,10 @@ class NCDataConstructor:
             index_val = index[~mask]
 
             out["x"] = xval
-            out["y"] = yval
+
+            if not no_output:
+                out["y"] = yval
+
             out["index"] = index_val
 
             torch.save(
@@ -563,6 +574,9 @@ class NCDataConstructor:
             )
 
         else:
+            if no_output:
+                out.pop("y")
+
             torch.save(
                 out,
                 os.path.join(
@@ -775,7 +789,6 @@ class NCDataConstructor:
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
 
-           
 
             cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
 

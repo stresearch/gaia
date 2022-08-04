@@ -308,6 +308,7 @@ def main(
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
+        # model params loaded from checkpoint during test
         model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
 
         # model.model.scale = 16

@@ -44,10 +44,11 @@ class Config():
         """
         Get the CLI args to override defaults during runtime
         """       
+        # make it a regular dict() for handling
         cli_args = OmegaConf.to_container(OmegaConf.from_cli())
         t = json.dumps(cli_args).translate(r'{}:\"\'')
         logger.info(f'CLI parameters: \n{t}')
-        return cls(cli_args = cli_args)
+        return cls(args = cli_args)
     
     @classmethod
     def readList(cls, dotlist=[]):
@@ -115,7 +116,7 @@ class Config():
                 var_index_file=var_index_file
             ),
             test=dict(
-                dataset_file=base+'_var_index.pt',
+                dataset_file=base+'_test.pt',
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened

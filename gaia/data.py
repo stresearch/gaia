@@ -364,9 +364,7 @@ def flatten_tensor(v):
         raise ValueError(f"shape {v.shape} not supported")
 
     if time_steps > 1:
-        v = v.permute([0, 3, 4, 1, 2]).reshape(
-                -1, time_steps, num_channels
-            )
+        v = v.permute([0, 3, 4, 1, 2]).reshape(-1, time_steps, num_channels)
     else:
         v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
 
@@ -383,18 +381,18 @@ def unflatten_tensor(v):
         raise ValueError(f"shape {v.shape} not supported")
 
     if time_steps > 1:
-        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4,  1, 2])
+        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4, 1, 2])
     else:
 
-         v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
+        v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
 
     return v
 
 
-def get_variable_index(dataset, variable_names, channel_dim = 1, return_dict = True):
+def get_variable_index(dataset, variable_names, channel_dim=1, return_dict=True):
     out = []
     i = 0
-    
+
     for n in variable_names:
         shape = dataset[n].shape
         if len(shape) < 4:
@@ -404,13 +402,14 @@ def get_variable_index(dataset, variable_names, channel_dim = 1, return_dict = T
         else:
             raise ValueError("all variables must have at least 3 dims")
         j = i + num_channels
-        out.append((n,[i, j]))
+        out.append((n, [i, j]))
         i = j
 
     if return_dict:
         out = OrderedDict(out)
 
     return out
+
 
 class NCDataConstructor:
     def __init__(
@@ -460,9 +459,9 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
-        train_years = 2,
-        cache = ".",
-        workers = 1
+        train_years=2,
+        cache=".",
+        workers=1,
     ):
         aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
         aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
@@ -494,20 +493,18 @@ class NCDataConstructor:
                 ","
             ),
             outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten= False,
-            shuffle = False,
+            flatten=False,
+            shuffle=False,
             subsample_factor=4,
             compute_stats=True,
-            cache = os.path.join(cache,split),
+            cache=os.path.join(cache, split),
             s3_client_kwargs=s3_client_kwargs,
             time_steps=0,
         )
 
-
         dataset_name = files[0].split("/")[-2]
 
         # out = data_constructor.load_files(files, save_file=None)
-
 
         out = data_constructor.load_files_parallel(
             files, num_workers=workers, save_file=None
@@ -651,7 +648,7 @@ class NCDataConstructor:
     def read_disk_file(self, file):
         return netCDF4_Dataset(file, "r", format="NETCDF4")
 
-    def load_file(self, file, cache_file = None):
+    def load_file(self, file, cache_file=None):
 
         try:
             dataset = self.read_data(file)
@@ -675,7 +672,6 @@ class NCDataConstructor:
                 return cache_file
 
             return x, y, new_index
-
 
         except Exception as e:
             logger.exception(e)
@@ -701,8 +697,6 @@ class NCDataConstructor:
         return xi, yi, shuffled_index
 
     def load_files(self, files, save_file=None):
-
-        
 
         x = []
         y = []
@@ -741,11 +735,10 @@ class NCDataConstructor:
             torch.save(out, save_file)
 
         return out
-        
 
     def load_files_parallel(self, files, num_workers=8, save_file=None):
         x = []
-        y = [] 
+        y = []
         index = []
 
         # def load_file_wrapper(*args,**kwargs):
@@ -760,39 +753,38 @@ class NCDataConstructor:
 
         os.makedirs(self.cache, exist_ok=True)
 
-        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache,"*"))):
+        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache, "*"))):
             os.remove(f)
 
         logger.info("downloading files")
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
 
-           
+            cache_files = [
+                os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))
+            ]
 
-            cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
+            futs = []
 
-            futs  = []
-
-            for f,cf in zip(files,cache_files):
+            for f, cf in zip(files, cache_files):
                 if os.path.exists(cf):
-                    #skip and continue
+                    # skip and continue
                     continue
-                fut = exec.submit(self.load_file,f,cf)
+                fut = exec.submit(self.load_file, f, cf)
                 futs.append(fut)
 
-            for fut in tqdm.tqdm(as_completed(futs),total = len(files)):
+            for fut in tqdm.tqdm(as_completed(futs), total=len(files)):
                 try:
                     fut.result()
                 except Exception as e:
                     logger.exception(e)
 
-            
         logger.info("merging files")
 
         for f in tqdm.tqdm(sorted(cache_files)):
             if os.path.exists(f):
                 try:
-                    xi,yi,indexi = torch.load(f)
+                    xi, yi, indexi = torch.load(f)
                 except Exception as e:
                     logger.exception(e)
                     logger.warning(f"failed {f}")
@@ -803,7 +795,6 @@ class NCDataConstructor:
             x.append(xi)
             y.append(yi)
             index.append(indexi)
-            
 
         x = torch.cat(x)
         y = torch.cat(y)
@@ -831,10 +822,10 @@ class NCDataConstructor:
         for f in tqdm.tqdm(sorted(cache_files)):
             if os.path.exists(f):
                 os.remove(f)
-                
+
         return out
 
-    def get_stats(self,x):
+    def get_stats(self, x):
         logger.info(f"computing stats for tensor of shape {x.shape}")
         outs = dict()
 
@@ -844,7 +835,6 @@ class NCDataConstructor:
             channel_dim = 2
 
         reduce_dims = [i for i in range(len(x.shape)) if i != channel_dim]
-        
 
         outs["mean"] = x.mean(dim=reduce_dims)
         outs["std"] = x.std(dim=reduce_dims)
@@ -853,42 +843,37 @@ class NCDataConstructor:
         return outs
 
 
+def unravel_index(flat_index, shape):
+    # flat_index = operator.index(flat_index)
+    res = []
 
+    # Short-circuits on zero dim tensors
+    if shape == torch.Size([]):
+        return 0
 
+    for size in shape[::-1]:
+        res.append(flat_index % size)
+        flat_index = flat_index // size
 
-def unravel_index(flat_index, shape): 
-     # flat_index = operator.index(flat_index) 
-     res = [] 
-  
-     # Short-circuits on zero dim tensors 
-     if shape == torch.Size([]): 
-         return 0 
-  
-     for size in shape[::-1]: 
-         res.append(flat_index % size) 
-         flat_index = flat_index // size 
-        
     # return torch.cat(res
-  
-     if len(res) == 1: 
-         return res[0] 
-  
-     return res[::-1]
 
+    if len(res) == 1:
+        return res[0]
 
+    return res[::-1]
 
 
 def get_dataset(
     dataset_file,
     batch_size=1024,
     flatten=False,
-    shuffle = False,
-    var_index_file = None,
-    include_index = False,
-    subsample = 1,
-    space_filter = None,
-    inputs = None,
-    outputs = None
+    shuffle=False,
+    var_index_file=None,
+    include_index=False,
+    subsample=1,
+    space_filter=None,
+    inputs=None,
+    outputs=None,
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -896,11 +881,9 @@ def get_dataset(
     # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
     var_index = torch.load(var_index_file)
 
-
-
     if (inputs is not None) or (outputs is not None):
 
-        assert len(dataset_dict["x"].shape) in [3,5]
+        assert len(dataset_dict["x"].shape) in [3, 5]
 
         logger.info("constructing custom inputs from datasets")
 
@@ -913,56 +896,52 @@ def get_dataset(
             channel_dim = 2
             D = common_data.shape[channel_dim]
 
-            common_data = torch.cat([common_data,dataset_dict["y"]],dim = channel_dim)
+            common_data = torch.cat([common_data, dataset_dict["y"]], dim=channel_dim)
 
-            for k,v in var_index["output_index"].items():
-                s,e = v
-                common_index[k] = [s+D, e+D]
+            for k, v in var_index["output_index"].items():
+                s, e = v
+                common_index[k] = [s + D, e + D]
 
-            for k,v in dataset_dict["stats"]["output_stats"].items():
+            for k, v in dataset_dict["stats"]["output_stats"].items():
                 common_stats[k] = torch.cat([common_stats[k], v])
 
-
-        def _make_one(names,time_index):
+        def _make_one(names, time_index):
             stats = defaultdict(list)
             index = OrderedDict()
             data = []
             current_index = 0
 
             for n in names:
-                s,e = common_index[n]
+                s, e = common_index[n]
                 d = e - s
-                data.append(common_data[:,time_index,s:e,...])
+                data.append(common_data[:, time_index, s:e, ...])
 
-                for k,v in common_stats.items():
-                    stats[k].append(v[s:e,...])
+                for k, v in common_stats.items():
+                    stats[k].append(v[s:e, ...])
 
-                index[n] = [current_index,current_index+d]
-                current_index = current_index+d
+                index[n] = [current_index, current_index + d]
+                current_index = current_index + d
 
-
-            data = torch.cat(data, dim = 1)
+            data = torch.cat(data, dim=1)
 
             for k in list(stats.keys()):
                 stats[k] = torch.cat(stats[k])
 
             return data, dict(stats), index
 
-
         logger.info("creating input")
 
-        d,s,i = _make_one(inputs, 0)
+        d, s, i = _make_one(inputs, 0)
         dataset_dict["x"] = d
         dataset_dict["input_index"] = i
         dataset_dict["stats"]["input_stats"] = s
 
         logger.info("creating output")
 
-        d,s,i = _make_one(outputs, 1)
+        d, s, i = _make_one(outputs, 1)
         dataset_dict["y"] = d
         dataset_dict["output_index"] = i
         dataset_dict["stats"]["output_stats"] = s
-        
 
     else:
 
@@ -970,30 +949,29 @@ def get_dataset(
 
         dataset_dict.update(var_index)
 
-        assert len(dataset_dict["x"].shape) in [3,5]
+        assert len(dataset_dict["x"].shape) in [3, 5]
 
         logger.warn("inputs are time step 0 and outputs are at timestep 1")
 
-        dataset_dict["x"] = dataset_dict["x"][:,0,...]
-        dataset_dict["y"] = dataset_dict["y"][:,1,...]
-    
+        dataset_dict["x"] = dataset_dict["x"][:, 0, ...]
+        dataset_dict["y"] = dataset_dict["y"][:, 1, ...]
 
     if flatten:
         logger.warning("flattening dataset")
         for v in ["x", "y"]:
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
-
     tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 
-
     if include_index or (space_filter is not None):
-        #TODO dont hard code this
-        num_ts,num_lats,num_lons = 8,96,144
-        logger.warning(f"using hardcoded expected shape for unraveling the index: {num_ts,num_lats,num_lons}")
+        # TODO dont hard code this
+        num_ts, num_lats, num_lons = 8, 96, 144
+        logger.warning(
+            f"using hardcoded expected shape for unraveling the index: {num_ts,num_lats,num_lons}"
+        )
 
         if flatten:
-            
+
             # index is flattened
             # shape = dataset_dict["x"].shape
             # if len(dataset_dict["x"].shape) == 3:
@@ -1003,21 +981,30 @@ def get_dataset(
 
             num_samples = dataset_dict["index"].shape[0]
 
-            lats = torch.ones(num_samples,1,num_lons)*torch.arange(num_lats)[None,:,None]
-            lons = torch.ones(num_samples,num_lats,1)*torch.arange(num_lons)[None,None,:]
-            index = torch.cat([lats.ravel().long()[:,None], lons.ravel().long()[:,None]],dim=-1)
+            lats = (
+                torch.ones(num_samples, 1, num_lons)
+                * torch.arange(num_lats)[None, :, None]
+            )
+            lons = (
+                torch.ones(num_samples, num_lats, 1)
+                * torch.arange(num_lons)[None, None, :]
+            )
+            index = torch.cat(
+                [lats.ravel().long()[:, None], lons.ravel().long()[:, None]], dim=-1
+            )
         else:
-            index = unravel_index(dataset_dict["index"], shape=[num_ts, num_lats, num_lons])
-            index = torch.cat([i[:,None] for i in index[1:]],dim=-1) #just want lats, lons
+            index = unravel_index(
+                dataset_dict["index"], shape=[num_ts, num_lats, num_lons]
+            )
+            index = torch.cat(
+                [i[:, None] for i in index[1:]], dim=-1
+            )  # just want lats, lons
 
-        
     else:
         del dataset_dict["index"]
 
-
     if include_index:
         tensor_list += [index]
-
 
     if space_filter is not None:
         # filter out dataset
@@ -1033,37 +1020,33 @@ def get_dataset(
         mask = torch.ones(len(tensor_list[0])).bool()
 
         if "lat_bounds" in space_filter:
-            lat_min,lat_max = space_filter["lat_bounds"]
-            temp = lats_vals[index[:,0]]
-            mask = mask & (temp <= lat_max) & (temp>=lat_min)
+            lat_min, lat_max = space_filter["lat_bounds"]
+            temp = lats_vals[index[:, 0]]
+            mask = mask & (temp <= lat_max) & (temp >= lat_min)
 
         if "lon_bounds" in space_filter:
-            lon_min,lon_max = space_filter["lon_bounds"]
-            temp = lons_vals[index[:,1]]
-            mask = mask & (temp <= lon_max) & (temp>=lon_min)
+            lon_min, lon_max = space_filter["lon_bounds"]
+            temp = lons_vals[index[:, 1]]
+            mask = mask & (temp <= lon_max) & (temp >= lon_min)
 
         assert mask.any()
 
-        tensor_list = [t[mask,...] for t in tensor_list]
+        tensor_list = [t[mask, ...] for t in tensor_list]
 
-
-    if subsample>1:
-        tensor_list = [t[::subsample,...] for t in tensor_list]
+    if subsample > 1:
+        tensor_list = [t[::subsample, ...] for t in tensor_list]
         logger.info(f"subsampling by factor of {subsample}")
-
 
     logger.info(f"data size {len(tensor_list[0])}")
 
-
     data_loader = DataLoader(
-        FastTensorDataset(
-            *tensor_list, batch_size=batch_size, shuffle=shuffle
-        ),
+        FastTensorDataset(*tensor_list, batch_size=batch_size, shuffle=shuffle),
         batch_size=None,
         pin_memory=True,
     )
 
     return dataset_dict, data_loader
+
 
 class FastTensorDataset(IterableDataset):
     """
@@ -1234,8 +1217,3 @@ class NcDatasetMem(Dataset):
 
 def make_dummy_dataset():
     return TensorDataset(torch.randn(10000, 26 * 2), torch.randn(10000, 26 * 2))
-
-
-
-
-

@@ -160,5 +160,5 @@ def export(model_dir, export_name, inputs=None, outputs=None):
         temp = pd.read_json(test_file).T
         temp.index = temp.index.str.replace("test_skill_ave_trunc_","")
         temp.columns = ["metric"]
-        temp.round(3).to_csv(str(test_file).replace(".json",".csv"))
+        temp.round(3).to_csv(os.path.join(model_dir, export_name.replace(".pt", "_test_skill.csv")))
 

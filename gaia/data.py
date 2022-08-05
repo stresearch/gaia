@@ -62,7 +62,7 @@ class NcIterableDataset(IterableDataset):
         subsample_factor=1,
         compute_stats=True,
     ):
-
+        raise DeprecationWarning
         self.flatten = flatten
         self.max_files_in_memory = max_files_in_memory
         self.shuffle = shuffle

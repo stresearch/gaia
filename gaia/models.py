@@ -13,6 +13,7 @@ from gaia.layers import (
     InterpolateGrid1D,
     MultiIndexEmbedding,
     Normalization,
+    NormalizationBN1D,
     ResDNNLayer,
     make_interpolation_weights,
 )
@@ -43,6 +44,7 @@ class TrainingModel(LightningModule):
         interpolate=None,
         predict_hidden_states=False,
         lr_schedule=None,
+        use_batch_norm_for_norm = False,
         **kwargs,
     ):
         super().__init__()
@@ -56,28 +58,6 @@ class TrainingModel(LightningModule):
         model_type = model_config["model_type"]
 
         self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
-
-        if memory_variables is not None:
-            logger.info(f"using a subset of output vars in memory: {memory_variables}")
-            memory_variable_index = []
-            for v in memory_variables:
-                memory_variable_index.append(torch.arange(*output_index[v]))
-            self.register_buffer(
-                "memory_variable_index", torch.cat(memory_variable_index)
-            )
-            model_config["memory_size"] = len(self.memory_variable_index)
-
-        if ignore_input_variables is not None:
-            logger.info(f"using a subset of inputs vars: {ignore_input_variables}")
-            input_variable_index = []
-            for k, v in input_index.items():
-                if k not in ignore_input_variables:
-                    start_idx, stop_idx = v
-                    input_variable_index.append(torch.arange(start_idx, stop_idx))
-            self.register_buffer(
-                "input_variable_index", torch.cat(input_variable_index)
-            )
-            model_config["input_size"] = len(self.input_variable_index)
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
@@ -113,31 +93,31 @@ class TrainingModel(LightningModule):
         #         raise ValueError("max_mean_threshold and loss_output_weights cant be both not None")
         #     outputs_to_ignore = self.output_normalize.std
 
-        if interpolate is not None:
-            logger.info(f"setting up interpolation")
+        # if interpolate is not None:
+        #     logger.info(f"setting up interpolation")
 
-            do_optimize = interpolate["optimize"]
+        #     do_optimize = interpolate["optimize"]
 
-            self.interpolate_data_to_model_input = InterpolateGrid1D(
-                input_grid=interpolate["input_grid"],
-                output_grid=interpolate["output_grid"],
-                input_grid_index=interpolate["input_index"],  # for the data
-                output_grid_index=input_index,  # for the model
-            ).requires_grad_(do_optimize)
+        #     self.interpolate_data_to_model_input = InterpolateGrid1D(
+        #         input_grid=interpolate["input_grid"],
+        #         output_grid=interpolate["output_grid"],
+        #         input_grid_index=interpolate["input_index"],  # for the data
+        #         output_grid_index=input_index,  # for the model
+        #     ).requires_grad_(do_optimize)
 
-            self.interpolate_data_to_model_output = InterpolateGrid1D(
-                input_grid=interpolate["input_grid"],
-                output_grid=interpolate["output_grid"],
-                input_grid_index=interpolate["output_index"],  # for the model
-                output_grid_index=output_index,  # for the data
-            ).requires_grad_(do_optimize)
+        #     self.interpolate_data_to_model_output = InterpolateGrid1D(
+        #         input_grid=interpolate["input_grid"],
+        #         output_grid=interpolate["output_grid"],
+        #         input_grid_index=interpolate["output_index"],  # for the model
+        #         output_grid_index=output_index,  # for the data
+        #     ).requires_grad_(do_optimize)
 
-            self.interpolate_model_to_data_output = InterpolateGrid1D(
-                input_grid=interpolate["output_grid"],
-                output_grid=interpolate["input_grid"],
-                input_grid_index=output_index,  # for the model
-                output_grid_index=interpolate["output_index"],  # for the data
-            ).requires_grad_(do_optimize)
+        #     self.interpolate_model_to_data_output = InterpolateGrid1D(
+        #         input_grid=interpolate["output_grid"],
+        #         output_grid=interpolate["input_grid"],
+        #         input_grid_index=output_index,  # for the model
+        #         output_grid_index=interpolate["output_index"],  # for the data
+        #     ).requires_grad_(do_optimize)
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -149,6 +129,11 @@ class TrainingModel(LightningModule):
         return w
 
     def setup_normalize(self, data_stats):
+        if self.hparams.use_batch_norm_for_norm:
+            input_normalization = NormalizationBN1D(self.hparams.model_config.input_size)
+            output_normalization = NormalizationBN1D(self.hparams.model_config.output_size)
+            return input_normalization, output_normalization
+
         if isinstance(data_stats, str) and os.path.exists(data_stats):
             stats = torch.load(data_stats)
         elif isinstance(data_stats, dict):
@@ -275,10 +260,10 @@ class TrainingModel(LightningModule):
             y1 = y[:, 0, ...]
             y2 = y[:, 1, ...]
 
-            if self.hparams.interpolate is not None:
-                x = self.interpolate_data_to_model_input(x)
-                # y1 = self.interpolate_data_to_model_output(y1)
-                # y2 = self.interpolate_data_to_model_output(y2)
+            # if self.hparams.interpolate is not None:
+            #     x = self.interpolate_data_to_model_input(x)
+            #     # y1 = self.interpolate_data_to_model_output(y1)
+            #     # y2 = self.interpolate_data_to_model_output(y2)
 
             x = self.input_normalize(x)
             x = self.select_input_variables(x)

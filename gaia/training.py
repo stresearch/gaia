@@ -126,8 +126,10 @@ def main(
     val_dataloader = None
 
     if "train" in mode:
-        train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
-        val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+
+        model_grid = model_params.get("model_grid", dataset_params["train"]["data_grid"])
+        train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
+        val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
 
         mean_thres = dataset_params["mean_thres"]
 
@@ -140,7 +142,7 @@ def main(
             train_dataset,
             model_params,
             mean_thres=mean_thres,
-            levels=get_levels(dataset_name),
+            levels=model_grid,
         )
 
         model = TrainingModel(dataset_params=dataset_params, **model_params)
@@ -165,6 +167,8 @@ def main(
         model_dir = trainer.log_dir
 
     if "finetune" in mode:
+
+        raise NotImplemented
         # assuming we'll fine-tune on a different dataset
         if model_params.get("pretrained", None) is not None:
             logger.info(f"loading pretrained {model_params}")
@@ -240,7 +244,8 @@ def main(
                     "_val.pt", "_var_index.pt"
                 )
 
-            val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
+            model_grid = model.hparams.get("model_grid", None)
+            val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid= model_grid )
 
         if trainer is None:
             trainer = pl.Trainer(
@@ -276,8 +281,9 @@ def main(
 
         # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
+        model_grid = model.hparams.get("model_grid", None)
         test_dataset, test_dataloader = get_dataset(
-            **model.hparams.dataset_params["test"]
+            **model.hparams.dataset_params["test"],model_grid = model_grid
         )
 
         trainer = pl.Trainer(
@@ -304,15 +310,19 @@ def main(
         )
 
         ### loading a different dataset
-        if interpolation_params:
-            logger.info("running interpolation")
-            test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
-            prediction_file_name = interpolation_params["prediction_file_name"]
-        else:
-            test_dataset, test_dataloader = get_dataset(
-                **model.hparams.dataset_params["test"]
-            )
-            prediction_file_name = "predictions.pt"
+        # if interpolation_params:
+        #     logger.info("running interpolation")
+        #     test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
+        #     prediction_file_name = interpolation_params["prediction_file_name"]
+        # else:
+
+        model_grid = model.hparams.get("model_grid", None)
+
+        test_dataset, test_dataloader = get_dataset(
+            **model.hparams.dataset_params["test"],model_grid = model_grid
+        )
+
+        prediction_file_name = "predictions.pt"
 
         trainer = pl.Trainer(
             log_every_n_steps=max(1, len(test_dataloader) // 100),

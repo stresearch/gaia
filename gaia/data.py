@@ -23,6 +23,8 @@ import json
 import hashlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+from gaia.layers import InterpolateGrid1D
+
 logger = get_logger(__name__)
 
 
@@ -894,6 +896,8 @@ def get_dataset(
     space_filter=None,
     inputs=None,
     outputs=None,
+    data_grid = None,
+    model_grid = None
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -980,6 +984,26 @@ def get_dataset(
         logger.warning("flattening dataset")
         for v in ["x", "y"]:
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
+
+
+    if (model_grid is not None) and (data_grid != model_grid):
+
+        logger.info(f"model grid is not equal to data grid.. need to interpolate from {len(data_grid)} grids to {len(model_grid)}")
+        input_interpolation = InterpolateGrid1D(input_grid=data_grid, output_grid=model_grid, input_grid_index=dataset_dict["input_index"])
+        dataset_dict["x"] = input_interpolation(dataset_dict["x"])
+
+        for k in dataset_dict["stats"]["input_stats"].keys():
+            dataset_dict["stats"]["input_stats"][k] = input_interpolation(dataset_dict["stats"]["input_stats"][k])
+
+        dataset_dict["input_index"] = input_interpolation.output_grid_index
+
+        output_interpolation = InterpolateGrid1D(input_grid=data_grid, output_grid=model_grid, input_grid_index=dataset_dict["output_index"])
+        dataset_dict["y"] = output_interpolation(dataset_dict["y"])
+
+        for k in dataset_dict["stats"]["output_stats"].keys():
+            dataset_dict["stats"]["output_stats"][k] = output_interpolation(dataset_dict["stats"]["output_stats"][k])
+
+        dataset_dict["output_index"] = output_interpolation.output_grid_index
 
     tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 

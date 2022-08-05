@@ -459,9 +459,15 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
-        train_years=2,
-        cache=".",
-        workers=1,
+        train_years = 7,
+        subsample_factor = 4,
+        cache = ".",
+        workers = 1, 
+        inputs = "Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
+                ","
+            ),
+        outputs = "PRECT,PRECC,PTEQ,PTTEND".split(","),
+        time_steps = 0
     ):
         aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
         aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
@@ -478,28 +484,35 @@ class NCDataConstructor:
 
         logger.info(f"found {len(files)} files")
 
-        if split == "train":
-            files = files[: 365 * train_years]
+        if split == "test":
+            start_index = train_years*365
+            end_index = (1+train_years)*365
+            files = files[start_index:end_index]
         else:
-            files = files[365 * train_years :]
+            start_index = 0
+            end_index = train_years*365
+            files = files[start_index:end_index]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
         )
 
+        if len(outputs) == 0:
+            no_output = True
+            logger.warning("no outputs will be constructed... adding a dummy output")
+            outputs = ["PRECC"]
+
         data_constructor = cls(
-            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
-                ","
-            ),
-            outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten=False,
-            shuffle=False,
-            subsample_factor=4,
+            inputs=inputs,
+            outputs=outputs,
+            flatten = split == "train",
+            shuffle = split == "train",
+            subsample_factor=subsample_factor,
             compute_stats=True,
             cache=os.path.join(cache, split),
             s3_client_kwargs=s3_client_kwargs,
-            time_steps=0,
+            time_steps=time_steps,
         )
 
         dataset_name = files[0].split("/")[-2]
@@ -524,7 +537,10 @@ class NCDataConstructor:
             index_train = index[mask]
 
             out["x"] = xtrain
-            out["y"] = ytrain
+
+            if not no_output:
+                out["y"] = ytrain
+
             out["index"] = index_train
 
             torch.save(
@@ -540,7 +556,10 @@ class NCDataConstructor:
             index_val = index[~mask]
 
             out["x"] = xval
-            out["y"] = yval
+
+            if not no_output:
+                out["y"] = yval
+
             out["index"] = index_val
 
             torch.save(
@@ -552,6 +571,9 @@ class NCDataConstructor:
             )
 
         else:
+            if no_output:
+                out.pop("y")
+
             torch.save(
                 out,
                 os.path.join(
@@ -760,13 +782,12 @@ class NCDataConstructor:
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
 
-            cache_files = [
-                os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))
-            ]
 
-            futs = []
+            cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
 
-            for f, cf in zip(files, cache_files):
+            futs  = []
+
+            for f,cf in zip(files,cache_files):
                 if os.path.exists(cf):
                     # skip and continue
                     continue

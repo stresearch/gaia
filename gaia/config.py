@@ -114,6 +114,8 @@ class Config():
         include_index = cli_args.get('dataset_params',{}).get("include_index",False)
         subsample = cli_args.get('dataset_params',{}).get("subsample",1)
         space_filter = cli_args.get('dataset_params',{}).get("space_filter",None)
+        inputs = cli_args.get('dataset_params',{}).get("inputs",None)
+        outputs = cli_args.get('dataset_params',{}).get("outputs",None)
         
         dataset_params = dict(
             train=dict(
@@ -124,7 +126,9 @@ class Config():
                 var_index_file=var_index_file,
                 include_index = include_index,
                 subsample = subsample,
-                space_filter =space_filter
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
@@ -134,7 +138,9 @@ class Config():
                 var_index_file=var_index_file,
                 include_index = include_index,
                 subsample = subsample,
-                space_filter =space_filter
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
@@ -144,7 +150,9 @@ class Config():
                 var_index_file=var_index_file,
                 include_index = include_index,
                 subsample = subsample,
-                space_filter =space_filter
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
             mean_thres=mean_thres
         )

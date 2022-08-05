@@ -2,7 +2,7 @@ from math import prod
 from random import shuffle
 import shutil
 from typing import Union
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import torch
 from torch.utils.data import (
     DataLoader,
@@ -853,83 +853,7 @@ class NCDataConstructor:
         return outs
 
 
-def get_dataset_v1(
-    files=None,
-    subsample_factor=12,
-    batch_size=1024,
-    shuffle=False,
-    in_memory=True,
-    flatten=True,
-    compute_stats=True,
-    flatten_anyway=False,
-    inputs=None,
-    outputs=None,
-    split_fraction=None,
-):
 
-    if not in_memory:
-        raise ValueError
-
-    dataset_dict = NcIterableDataset(
-        files,
-        max_files_in_memory=1,
-        batch_size=24,
-        shuffle=False,
-        flatten=flatten,  # False  -> use "globe" images
-        inputs=inputs,
-        outputs=outputs,
-        subsample_factor=subsample_factor,
-        compute_stats=compute_stats,
-    ).get_tensors(cache_dir="/ssddg1/gaia/cache")
-
-    del dataset_dict["index"]
-
-    if flatten_anyway:
-        logger.warning("flattening dataset")
-        for v in ["x", "y"]:
-            dataset_dict[v] = (
-                dataset_dict[v]
-                .permute([0, 2, 3, 1])
-                .reshape(-1, dataset_dict[v].shape[1])
-            )
-
-    if split_fraction is not None:
-        logger.info("making val set by splitting train set in a truly random fashion")
-        mask_train = torch.rand(dataset_dict["x"].shape[0]) >= split_fraction
-
-        data_loader_train = DataLoader(
-            FastTensorDataset(
-                dataset_dict["x"][mask_train],
-                dataset_dict["y"][mask_train],
-                batch_size=batch_size,
-                shuffle=shuffle,
-            ),
-            batch_size=None,
-            pin_memory=True,
-        )
-
-        data_loader_test = DataLoader(
-            FastTensorDataset(
-                dataset_dict["x"][~mask_train],
-                dataset_dict["y"][~mask_train],
-                batch_size=batch_size,
-                shuffle=False,
-            ),
-            batch_size=None,
-            pin_memory=True,
-        )
-
-        return dataset_dict, data_loader_train, data_loader_test
-
-    data_loader = DataLoader(
-        FastTensorDataset(
-            dataset_dict["x"], dataset_dict["y"], batch_size=batch_size, shuffle=shuffle
-        ),
-        batch_size=None,
-        pin_memory=True,
-    )
-
-    return dataset_dict, data_loader
 
 
 def unravel_index(flat_index, shape): 
@@ -962,7 +886,9 @@ def get_dataset(
     var_index_file = None,
     include_index = False,
     subsample = 1,
-    space_filter = None
+    space_filter = None,
+    inputs = None,
+    outputs = None
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -970,8 +896,86 @@ def get_dataset(
     # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
     var_index = torch.load(var_index_file)
 
-    dataset_dict.update(var_index)
 
+
+    if (inputs is not None) or (outputs is not None):
+
+        assert len(dataset_dict["x"].shape) in [3,5]
+
+        logger.info("constructing custom inputs from datasets")
+
+        common_index = var_index["input_index"]
+        common_stats = dataset_dict["stats"]["input_stats"]
+        common_data = dataset_dict["x"]
+
+        if "y" in dataset_dict:
+            logger.info("found y... merging with x")
+            channel_dim = 2
+            D = common_data.shape[channel_dim]
+
+            common_data = torch.cat([common_data,dataset_dict["y"]],dim = channel_dim)
+
+            for k,v in var_index["output_index"].items():
+                s,e = v
+                common_index[k] = [s+D, e+D]
+
+            for k,v in dataset_dict["stats"]["output_stats"].items():
+                common_stats[k] = torch.cat([common_stats[k], v])
+
+
+        def _make_one(names,time_index):
+            stats = defaultdict(list)
+            index = OrderedDict()
+            data = []
+            current_index = 0
+
+            for n in names:
+                s,e = common_index[n]
+                d = e - s
+                data.append(common_data[:,time_index,s:e,...])
+
+                for k,v in common_stats.items():
+                    stats[k].append(v[s:e,...])
+
+                index[n] = [current_index,current_index+d]
+                current_index = current_index+d
+
+
+            data = torch.cat(data, dim = 1)
+
+            for k in list(stats.keys()):
+                stats[k] = torch.cat(stats[k])
+
+            return data, dict(stats), index
+
+
+        logger.info("creating input")
+
+        d,s,i = _make_one(inputs, 0)
+        dataset_dict["x"] = d
+        dataset_dict["input_index"] = i
+        dataset_dict["stats"]["input_stats"] = s
+
+        logger.info("creating output")
+
+        d,s,i = _make_one(outputs, 1)
+        dataset_dict["y"] = d
+        dataset_dict["output_index"] = i
+        dataset_dict["stats"]["output_stats"] = s
+        
+
+    else:
+
+        logger.info("assuming default inputs")
+
+        dataset_dict.update(var_index)
+
+        assert len(dataset_dict["x"].shape) in [3,5]
+
+        logger.warn("inputs are time step 0 and outputs are at timestep 1")
+
+        dataset_dict["x"] = dataset_dict["x"][:,0,...]
+        dataset_dict["y"] = dataset_dict["y"][:,1,...]
     
 
     if flatten:

@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from gaia.plot import levels26, levels, get_levels
+from gaia.plot import levels26, levels
+from gaia.config import get_levels
 import yaml
 
 from gaia import get_logger
@@ -127,16 +128,15 @@ def main(
 
     if "train" in mode:
 
+        logger.info("**** TRAINING ******")
+
         model_grid = model_params.get("model_grid", dataset_params["train"]["data_grid"])
+
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
         val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
 
         mean_thres = dataset_params["mean_thres"]
 
-        # TODO fix
-        dataset_name = (
-            "cam4" if "cam4" in dataset_params["train"]["dataset_file"] else "spcam"
-        )
 
         update_model_params_from_dataset(
             train_dataset,
@@ -226,6 +226,10 @@ def main(
         model_dir = trainer.log_dir
 
     if "val" in mode:
+
+        logger.info("**** VALIDATING ******")
+
+
         if model_dir is None:
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
@@ -261,7 +265,7 @@ def main(
             open(os.path.join(model_dir, "validation_score.json"), "w"),
         )
 
-    if "test" in mode:
+    if ("test" in mode) or ("predict" in mode):
 
         if model_dir is None:
             assert "ckpt" in model_params
@@ -290,6 +294,13 @@ def main(
         # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
         model_grid = model.hparams.get("model_grid", None)
+        if model_grid is None:
+            logger.info("model grid is not found... trying to infer from dataset")
+            dataset = model.hparams.dataset_params.get(dataset,None)
+            if dataset:
+                model_grid = get_levels(dataset)
+
+
         test_dataset, test_dataloader = get_dataset(
             **dataset_params["test"], model_grid = model_grid
         )
@@ -300,59 +311,41 @@ def main(
             **trainer_params,
         )
 
-        test_results = trainer.test(model, dataloaders=test_dataloader)
-        # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(model_dir, f"test_results.json")
-        json.dump(test_results, open(path_to_save, "w"))
-
-    if "predict" in mode:
-
-        if model_dir is None:
-            assert "ckpt" in model_params
-            model_dir = model_params["ckpt"]
-
-        model = TrainingModel.load_from_checkpoint(
-            get_checkpoint_file(model_dir),
-            strict=False,
-            **{"interpolate": interpolation_params, "predict_hidden_states": False},
-        )
-
-        ### loading a different dataset
-        # if interpolation_params:
-        #     logger.info("running interpolation")
-        #     test_dataset, test_dataloader = get_dataset(**dataset_params["test"])
-        #     prediction_file_name = interpolation_params["prediction_file_name"]
-        # else:
-
-        if dataset_params is None:
-            logger.info("no dataset params provided, using saved ones in checkpoint")
-            dataset_params = model.hparams.dataset_params
+        if "test" in mode:
+            logger.info("**** TESTING ******")
 
 
-        test_dataset, test_dataloader = get_dataset(
-            **dataset_params["test"],model_grid = model.hparams.get("model_grid", None)
-        )
+            test_results = trainer.test(model, dataloaders=test_dataloader)
+            # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+            dataset = dataset_params.get("dataset","")
+            path_to_save = os.path.join(model_dir, f"test_results_{dataset}.json")
+            json.dump(test_results, open(path_to_save, "w"))
 
-        prediction_file_name = "predictions.pt"
+        if "predict" in mode:
+            
+            logger.info("**** PREDICTING ******")
+            
+            dataset = dataset_params.get("dataset","")
+            prediction_file_name = f"predictions_{dataset}.pt"
 
-        trainer = pl.Trainer(
-            log_every_n_steps=max(1, len(test_dataloader) // 100),
-            checkpoint_callback=False,
-            logger=False,
-            **trainer_params,
-        )
+            trainer = pl.Trainer(
+                log_every_n_steps=max(1, len(test_dataloader) // 100),
+                checkpoint_callback=False,
+                logger=False,
+                **trainer_params,
+            )
 
-        yhat = trainer.predict(model, dataloaders=test_dataloader)
-        # return yhat
-        yhat = torch.cat(yhat)
+            yhat = trainer.predict(model, dataloaders=test_dataloader)
+            # return yhat
+            yhat = torch.cat(yhat)
 
-        if len(yhat.shape) in [2, 3]:
-            yhat = unflatten_tensor(yhat)
+            if len(yhat.shape) in [2, 3]:
+                yhat = unflatten_tensor(yhat)
 
-        # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-        path_to_save = os.path.join(model_dir, prediction_file_name)
+            # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+            path_to_save = os.path.join(model_dir, prediction_file_name)
 
-        torch.save(yhat, path_to_save)
+            torch.save(yhat, path_to_save)
 
     if "results" in mode:
 

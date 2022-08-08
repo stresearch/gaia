@@ -910,8 +910,7 @@ def get_dataset(
     if (inputs is not None) or (outputs is not None):
 
         assert len(dataset_dict["x"].shape) in [3, 5]
-
-        logger.info("constructing custom inputs from datasets")
+        logger.info(f"constructing custom inputs from datasets: inputs: {inputs} outputs: {outputs}")
 
         common_index = var_index["input_index"]
         common_stats = dataset_dict["stats"]["input_stats"]

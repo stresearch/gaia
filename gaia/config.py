@@ -71,6 +71,15 @@ levels = {"spcam" : [
 ]
 }
 
+def get_levels(dataset):
+    if "cam4" in dataset:
+        return levels["cam4"]
+
+    elif "spcam" in dataset:
+        return levels["spcam"]
+    else:
+        raise ValueError(f"unknown dataset {dataset}")
+
 class Config():
     valid_top_level = ["mode","seed","interpolation_params","dataset_params" ,"trainer_params","model_params" ]
     """
@@ -229,7 +238,8 @@ class Config():
                 outputs = outputs,
                 data_grid = data_grid
             ),
-            mean_thres=mean_thres
+            mean_thres=mean_thres,
+            dataset = dataset
         )
         return dataset_params
     

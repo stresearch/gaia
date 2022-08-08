@@ -146,6 +146,11 @@ class Config():
         """
         Set the dataset params
         """
+
+        if cli_args.get('dataset_params',None) is None:
+            logger.info("no dataset provided ... you must be loading it from an existing model")
+            return None
+
         base = cli_args.get('dataset_params',{}).get("prefix",None)
 
         if base is None:
@@ -159,7 +164,7 @@ class Config():
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
             }
 
-            dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
+            dataset = cli_args.get('dataset_params',{}).get('dataset', None)
             base = dataset_paths[dataset]
             
         if "cam4" in dataset:
@@ -227,7 +232,6 @@ class Config():
             mean_thres=mean_thres
         )
         return dataset_params
-        # return merge(dataset_params, cli_args.get('dataset_params',{}))
     
     @staticmethod
     def set_model_params(cli_args=dict()):

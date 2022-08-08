@@ -234,18 +234,19 @@ def main(
         model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
 
         if val_dataloader is None:
-            dataset_params = model.hparams.dataset_params
+            if dataset_params is None:
+                logger.info("no dataset_params provided, using saved ones in checkpoint")
+                dataset_params = model.hparams.dataset_params
 
-            if "var_index_file" not in model.hparams.dataset_params["val"]:
-                logger.info("adding var index file")
-                model.hparams.dataset_params["val"][
-                    "var_index_file"
-                ] = model.hparams.dataset_params["val"]["dataset_file"].replace(
-                    "_val.pt", "_var_index.pt"
-                )
+                # if "var_index_file" not in model.hparams.dataset_params["val"]:
+                #     logger.info("adding var index file")
+                #     model.hparams.dataset_params["val"][
+                #         "var_index_file"
+                #     ] = model.hparams.dataset_params["val"]["dataset_file"].replace(
+                #         "_val.pt", "_var_index.pt"
+                #     )
 
-            model_grid = model.hparams.get("model_grid", None)
-            val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid= model_grid )
+            val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid= model.hparams.get("model_grid", None) )
 
         if trainer is None:
             trainer = pl.Trainer(
@@ -270,20 +271,27 @@ def main(
 
         # model.model.scale = 16
 
-        # bug
-        if "var_index_file" not in model.hparams.dataset_params["test"]:
-            logger.info("adding var index file")
-            model.hparams.dataset_params["test"][
-                "var_index_file"
-            ] = model.hparams.dataset_params["test"]["dataset_file"].replace(
-                "_test.pt", "_var_index.pt"
-            )
+        if dataset_params is None:
+            logger.info("no dataset params provided, using saved ones in checkpoint")
+
+            # # bug
+            # if "var_index_file" not in model.hparams.dataset_params["test"]:
+            #     logger.info("adding var index file")
+            #     model.hparams.dataset_params["test"][
+            #         "var_index_file"
+            #     ] = model.hparams.dataset_params["test"]["dataset_file"].replace(
+            #         "_test.pt", "_var_index.pt"
+            #     )
+            
+            dataset_params = model.hparams.dataset_params
+
+        
 
         # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
         model_grid = model.hparams.get("model_grid", None)
         test_dataset, test_dataloader = get_dataset(
-            **model.hparams.dataset_params["test"],model_grid = model_grid
+            **dataset_params["test"], model_grid = model_grid
         )
 
         trainer = pl.Trainer(
@@ -316,10 +324,13 @@ def main(
         #     prediction_file_name = interpolation_params["prediction_file_name"]
         # else:
 
-        model_grid = model.hparams.get("model_grid", None)
+        if dataset_params is None:
+            logger.info("no dataset params provided, using saved ones in checkpoint")
+            dataset_params = model.hparams.dataset_params
+
 
         test_dataset, test_dataloader = get_dataset(
-            **model.hparams.dataset_params["test"],model_grid = model_grid
+            **dataset_params["test"],model_grid = model.hparams.get("model_grid", None)
         )
 
         prediction_file_name = "predictions.pt"

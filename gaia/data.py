@@ -897,13 +897,15 @@ def get_dataset(
     inputs=None,
     outputs=None,
     data_grid = None,
-    model_grid = None
+    model_grid = None,
 ):
 
     dataset_dict = torch.load(dataset_file)
 
     # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
     var_index = torch.load(var_index_file)
+
+    # construct dataset from specified inputs 
 
     if (inputs is not None) or (outputs is not None):
 
@@ -985,6 +987,8 @@ def get_dataset(
         for v in ["x", "y"]:
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
+
+    # do some grid interpolation
 
     if (model_grid is not None) and (data_grid != model_grid):
 

@@ -8,6 +8,78 @@ import re
 
 logger = get_logger(__name__)
 
+
+levels = {"spcam" : [
+    3.64346569404006,
+    7.594819646328688,
+    14.356632251292467,
+    24.612220004200935,
+    38.26829977333546,
+    54.59547974169254,
+    72.01245054602623,
+    87.82123029232025,
+    103.31712663173676,
+    121.54724076390266,
+    142.99403876066208,
+    168.22507977485657,
+    197.9080867022276,
+    232.82861895859241,
+    273.9108167588711,
+    322.2419023513794,
+    379.10090386867523,
+    445.992574095726,
+    524.6871747076511,
+    609.7786948084831,
+    691.3894303143024,
+    763.404481112957,
+    820.8583686500788,
+    859.5347665250301,
+    887.0202489197254,
+    912.644546944648,
+    936.1983984708786,
+    957.485479535535,
+    976.325407391414,
+    992.556095123291,
+],
+"cam4" : [
+    3.5446380000000097,
+    7.3888135000000075,
+    13.967214000000006,
+    23.944625,
+    37.23029000000011,
+    53.1146050000002,
+    70.05915000000029,
+    85.43911500000031,
+    100.51469500000029,
+    118.25033500000026,
+    139.11539500000046,
+    163.66207000000043,
+    192.53993500000033,
+    226.51326500000036,
+    266.4811550000001,
+    313.5012650000006,
+    368.81798000000157,
+    433.8952250000011,
+    510.45525500000167,
+    600.5242000000027,
+    696.7962900000033,
+    787.7020600000026,
+    867.1607600000013,
+    929.6488750000024,
+    970.5548300000014,
+    992.5560999999998,
+]
+}
+
+def get_levels(dataset):
+    if "cam4" in dataset:
+        return levels["cam4"]
+
+    elif "spcam" in dataset:
+        return levels["spcam"]
+    else:
+        raise ValueError(f"unknown dataset {dataset}")
+
 class Config():
     valid_top_level = ["mode","seed","interpolation_params","dataset_params" ,"trainer_params","model_params" ]
     """
@@ -83,6 +155,11 @@ class Config():
         """
         Set the dataset params
         """
+
+        if cli_args.get('dataset_params',None) is None:
+            logger.info("no dataset provided ... you must be loading it from an existing model")
+            return None
+
         base = cli_args.get('dataset_params',{}).get("prefix",None)
 
         if base is None:
@@ -96,13 +173,16 @@ class Config():
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
             }
 
-            dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
+            dataset = cli_args.get('dataset_params',{}).get('dataset', None)
             base = dataset_paths[dataset]
             
         if "cam4" in dataset:
             mean_thres = 1e-13
+            data_grid = levels["cam4"]
+
         elif "spcam" in dataset:
             mean_thres = 1e-15
+            data_grid = levels["spcam"]
         else:
             raise ValueError(f"unknown dataset {dataset}")
 
@@ -116,6 +196,7 @@ class Config():
         space_filter = cli_args.get('dataset_params',{}).get("space_filter",None)
         inputs = cli_args.get('dataset_params',{}).get("inputs",None)
         outputs = cli_args.get('dataset_params',{}).get("outputs",None)
+        data_grid = cli_args.get('dataset_params',{}).get("data_grid",data_grid)
         
         dataset_params = dict(
             train=dict(
@@ -128,7 +209,8 @@ class Config():
                 subsample = subsample,
                 space_filter =space_filter,
                 inputs = inputs,
-                outputs = outputs
+                outputs = outputs,
+                data_grid = data_grid
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
@@ -140,7 +222,8 @@ class Config():
                 subsample = subsample,
                 space_filter =space_filter,
                 inputs = inputs,
-                outputs = outputs
+                outputs = outputs,
+                data_grid = data_grid
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
@@ -152,12 +235,13 @@ class Config():
                 subsample = subsample,
                 space_filter =space_filter,
                 inputs = inputs,
-                outputs = outputs
+                outputs = outputs,
+                data_grid = data_grid
             ),
-            mean_thres=mean_thres
+            mean_thres=mean_thres,
+            dataset = dataset
         )
         return dataset_params
-        # return merge(dataset_params, cli_args.get('dataset_params',{}))
     
     @staticmethod
     def set_model_params(cli_args=dict()):

@@ -909,6 +909,12 @@ def get_dataset(
 
     if (inputs is not None) or (outputs is not None):
 
+        if inputs is None:
+            inputs = list(var_index["input_index"].keys())
+
+        if outputs is None:
+            outputs = list(var_index["output_index"].keys())
+
         assert len(dataset_dict["x"].shape) in [3, 5]
         logger.info(f"constructing custom inputs from datasets: inputs: {inputs} outputs: {outputs}")
 

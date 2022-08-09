@@ -45,17 +45,20 @@ class TrainingModel(LightningModule):
         predict_hidden_states=False,
         lr_schedule=None,
         use_batch_norm_for_norm = False,
+        fine_tuning = False,
         **kwargs,
     ):
         super().__init__()
 
         if not isinstance(data_stats, str):
-            ignore = ["data_stats"]
+            ignore = ["data_stats", "fine_tuning"]
         else:
             ignore = None
 
         self.save_hyperparameters(ignore=ignore)
         model_type = model_config["model_type"]
+
+        self.fine_tuning = fine_tuning
 
         self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
 
@@ -130,8 +133,9 @@ class TrainingModel(LightningModule):
 
     def setup_normalize(self, data_stats):
         if self.hparams.use_batch_norm_for_norm:
-            input_normalization = NormalizationBN1D(self.hparams.model_config.input_size)
-            output_normalization = NormalizationBN1D(self.hparams.model_config.output_size)
+            logger.info("using batch norm for norm ...")
+            input_normalization = NormalizationBN1D(self.hparams.model_config["input_size"])
+            output_normalization = NormalizationBN1D(self.hparams.model_config["output_size"])
             return input_normalization, output_normalization
 
         if isinstance(data_stats, str) and os.path.exists(data_stats):
@@ -300,6 +304,9 @@ class TrainingModel(LightningModule):
         # x, y = batch
         # x = self.input_normalize(x)
         # y = self.output_normalize(y)
+
+        if self.fine_tuning:
+            self.model.eval()
 
         x, y, index = self.handle_batch(batch)
 

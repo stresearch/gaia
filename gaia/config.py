@@ -81,7 +81,7 @@ def get_levels(dataset):
         raise ValueError(f"unknown dataset {dataset}")
 
 class Config():
-    valid_top_level = ["mode","seed","interpolation_params","dataset_params" ,"trainer_params","model_params" ]
+    valid_top_level = ["mode","seed","dataset_params" ,"trainer_params","model_params" ]
     """
     Initialize config with default parameter
     then parse cli args and merge
@@ -99,7 +99,6 @@ class Config():
 
         mode = 'train,val,test'
         seed = True
-        interpolation_params = None
         
         # set trainer params 
         trainer_params = self.set_trainer_params(cli_args)
@@ -117,7 +116,6 @@ class Config():
             dataset_params = dataset_params,
             model_params = model_params,
             seed = seed,
-            interpolation_params = interpolation_params,
         )
         self.config = merge(config, cli_args)
 
@@ -247,8 +245,6 @@ class Config():
     def set_model_params(cli_args=dict()):
         model_config = model_type_lookup(cli_args.get('model_params',{}).get('model_type', 'fcn'))
         model_params = dict(
-            memory_variables=None,      # can be ',' sep
-            ignore_input_variables=None,# can be ',' sep
             model_config = model_config,
             lr=1e-3,
             use_output_scaling=False,

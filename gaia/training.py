@@ -169,18 +169,23 @@ def main(
     if "finetune" in mode:
 
 
+
         logger.info("**** FINE TUNING ******")
 
         if model_dir is None:
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
-        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), fine_tuning = True, map_location="cpu")
+        model_params_to_update = {k:model_params[k] for k in ["lr","lr_schedule"]}
+        model_params_to_update["dataset_params"] = dataset_params
+        model_params_to_update["is_finetuned"] = True
+
+        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), fine_tuning = False, map_location="cpu", **model_params_to_update)
 
 
         # disable everything but last later
-        model.requires_grad_(False)
-        model.model.model[-1].requires_grad_(True)
+        # model.requires_grad_(False)
+        # model.model.model[-1].requires_grad_(True)
 
         
         model_grid = model.hparams.get("model_grid", None)
@@ -190,11 +195,12 @@ def main(
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
         val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
 
+        assert train_dataset["input_index"] == model.hparams.input_index
+        assert train_dataset["output_index"] == model.hparams.output_index
+
         mean_thres = dataset_params["mean_thres"]
 
-        # update_model_params_from_dataset(
-        #     train_dataset, interpolation_params, mean_thres=mean_thres
-        # )
+        
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 

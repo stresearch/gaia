@@ -17,7 +17,14 @@ Code repository and documentation for:
 ![](sections/overview/str.png)   ![](https://www.unsw.edu.au/content/dam/images/graphics/logos/unsw/unsw_0.png)
 
 - [STR](https://www.str.us) 
-- [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
+  -   Jim Gimlett
+  -   Gregory Bushey
+  -   Kirill Trapeznikov
+  -   Eric Jones
+- [University of New South Wales, Sydney](https://www.unsw.edu.au/)
+  -  [Steven Sherwood](https://www.unsw.edu.au/staff/steven-sherwood)
+  -  [Abhnil Prasad](https://www.unsw.edu.au/staff/abhnil-prasad)
+  -  David Fuchs 
 
 ## Sections
 - [Datasets](sections/datasets/README.md) - description of datasets used in surrogate training

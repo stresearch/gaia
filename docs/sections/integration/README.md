@@ -1,7 +1,9 @@
-# Integration Journal
+# Integration Journal <!-- omit in toc --> 
 
-## Surrogate Training
-
+- [Training Plots](#training-plots)
+- [Prediction Diagnostic Plots](#prediction-diagnostic-plots)
+- [Skill Scores](#skill-scores)
+- [Hyper Parameters](#hyper-parameters)
 
 ### Training Plots
 

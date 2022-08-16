@@ -284,7 +284,7 @@ def main(
         model_grid = model.hparams.get("model_grid", None)
         if model_grid is None:
             logger.info("model grid is not found... trying to infer from dataset")
-            dataset = model.hparams.dataset_params.get(dataset,None)
+            dataset = model.hparams.dataset_params.get("dataset",None)
             if dataset:
                 model_grid = get_levels(dataset)
 

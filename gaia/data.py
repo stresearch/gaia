@@ -995,7 +995,7 @@ def get_dataset(
 
     # do some grid interpolation
 
-    if (model_grid is not None) and (data_grid != model_grid):
+    if (data_grid is not None) and (model_grid is not None) and (data_grid != model_grid):
 
         logger.info(f"model grid is not equal to data grid.. need to interpolate from {len(data_grid)} grids to {len(model_grid)}")
         input_interpolation = InterpolateGrid1D(input_grid=data_grid, output_grid=model_grid, input_grid_index=dataset_dict["input_index"])

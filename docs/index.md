@@ -37,6 +37,7 @@ Code repository and documentation for:
 - [Surrogate Bottleneck Analysis](sections/bottleneck/README.md) - analysis of bottleneck dimension of the surrogate model
 - [Linearization](sections/linearization/README.md) - analysis linearization of surrogate models to understand sensitivity to inputs
 - [Surrogate Architectures](sections/architectures/README.md) - comparison of different neural network architectures and configurations
+- [Fine Tuning](sections/finetuning/README.md) - comparison of fine-tuning an CAM4 trained model on SPCAM vs a model traiend from scratch
 
 
 ## Overview

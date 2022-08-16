@@ -38,7 +38,7 @@ Code repository and documentation for:
 - [Linearization](sections/linearization/README.md) - analysis linearization of surrogate models to understand sensitivity to inputs
 - [Surrogate Architectures](sections/architectures/README.md) - comparison of different neural network architectures and configurations
 - [Fine Tuning](sections/finetuning/README.md) - comparison of fine-tuning an CAM4 trained model on SPCAM vs a model traiend from scratch
-
+- [Intergration Journal](sections/integration/README.md) - comparison of fine-tuning an CAM4 trained model on SPCAM vs a model traiend from scratch
 
 ## Overview
 

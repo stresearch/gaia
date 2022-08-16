@@ -293,14 +293,16 @@ def main(
             **dataset_params["test"], model_grid = model_grid
         )
 
-        trainer = pl.Trainer(
-            checkpoint_callback=False,
-            logger=False,
-            **trainer_params,
-        )
+        
 
         if "test" in mode:
             logger.info("**** TESTING ******")
+
+            trainer = pl.Trainer(
+            checkpoint_callback=False,
+            logger=False,
+            **trainer_params,
+            )
 
 
             test_results = trainer.test(model, dataloaders=test_dataloader)

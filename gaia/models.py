@@ -321,7 +321,7 @@ class TrainingModel(LightningModule):
         self.step(batch, "test")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
-        x, y = self.handle_batch(batch)
+        x, y, index = self.handle_batch(batch)
 
         if self.hparams.predict_hidden_states:
             y, h = self.model(x, return_hidden_state=True)

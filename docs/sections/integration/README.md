@@ -1,4 +1,4 @@
-# Intergration Journal
+# Integration Journal
 
 ## Surrogate Training
 

@@ -2,7 +2,7 @@ from math import prod
 from random import shuffle
 import shutil
 from typing import Union
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import torch
 from torch.utils.data import (
     DataLoader,
@@ -62,7 +62,7 @@ class NcIterableDataset(IterableDataset):
         subsample_factor=1,
         compute_stats=True,
     ):
-
+        raise DeprecationWarning
         self.flatten = flatten
         self.max_files_in_memory = max_files_in_memory
         self.shuffle = shuffle
@@ -364,9 +364,7 @@ def flatten_tensor(v):
         raise ValueError(f"shape {v.shape} not supported")
 
     if time_steps > 1:
-        v = v.permute([0, 3, 4, 1, 2]).reshape(
-                -1, time_steps, num_channels
-            )
+        v = v.permute([0, 3, 4, 1, 2]).reshape(-1, time_steps, num_channels)
     else:
         v = v.permute([0, 2, 3, 1]).reshape(-1, num_channels)
 
@@ -383,18 +381,18 @@ def unflatten_tensor(v):
         raise ValueError(f"shape {v.shape} not supported")
 
     if time_steps > 1:
-        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4,  1, 2])
+        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4, 1, 2])
     else:
 
-         v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
+        v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
 
     return v
 
 
-def get_variable_index(dataset, variable_names, channel_dim = 1):
-    out = OrderedDict()
+def get_variable_index(dataset, variable_names, channel_dim=1, return_dict=True):
+    out = []
     i = 0
-    
+
     for n in variable_names:
         shape = dataset[n].shape
         if len(shape) < 4:
@@ -404,10 +402,14 @@ def get_variable_index(dataset, variable_names, channel_dim = 1):
         else:
             raise ValueError("all variables must have at least 3 dims")
         j = i + num_channels
-        out[n] = [i, j]
+        out.append((n, [i, j]))
         i = j
 
+    if return_dict:
+        out = OrderedDict(out)
+
     return out
+
 
 class NCDataConstructor:
     def __init__(
@@ -457,9 +459,13 @@ class NCDataConstructor:
         bucket_name="ff350d3a-89fc-11ec-a398-ac1f6baca408",
         prefix="spcamclbm-nx-16-20m-timestep",
         save_location="/ssddg1/gaia/spcam",
-        train_years = 2,
-        cache = ".",
-        workers = 1
+        train_years=7,
+        subsample_factor=4,
+        cache=".",
+        workers=1,
+        inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(","),
+        outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
+        time_steps=0,
     ):
         aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
         aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
@@ -476,35 +482,40 @@ class NCDataConstructor:
 
         logger.info(f"found {len(files)} files")
 
-        if split == "train":
-            files = files[: 365 * train_years]
+        if split == "test":
+            start_index = train_years * 365
+            end_index = (1 + train_years) * 365
+            files = files[start_index:end_index]
         else:
-            files = files[365 * train_years :]
+            start_index = 0
+            end_index = train_years * 365
+            files = files[start_index:end_index]
 
         s3_client_kwargs = dict(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
         )
 
-        data_constructor = cls(
-            inputs="Q,T,U,V,OMEGA,PSL,SOLIN,SHFLX,LHFLX,FSNS,FLNS,FSNT,FLNT,Z3".split(
-                ","
-            ),
-            outputs="PRECT,PRECC,PTEQ,PTTEND".split(","),
-            flatten= False,
-            shuffle = False,
-            subsample_factor=4,
-            compute_stats=True,
-            cache = os.path.join(cache,split),
-            s3_client_kwargs=s3_client_kwargs,
-            time_steps=0,
-        )
+        if len(outputs) == 0:
+            no_output = True
+            logger.warning("no outputs will be constructed... adding a dummy output")
+            outputs = ["PRECC"]
 
+        data_constructor = cls(
+            inputs=inputs,
+            outputs=outputs,
+            flatten=split == "train",
+            shuffle=split == "train",
+            subsample_factor=subsample_factor,
+            compute_stats=True,
+            cache=os.path.join(cache, split),
+            s3_client_kwargs=s3_client_kwargs,
+            time_steps=time_steps,
+        )
 
         dataset_name = files[0].split("/")[-2]
 
         # out = data_constructor.load_files(files, save_file=None)
-
 
         out = data_constructor.load_files_parallel(
             files, num_workers=workers, save_file=None
@@ -524,7 +535,10 @@ class NCDataConstructor:
             index_train = index[mask]
 
             out["x"] = xtrain
-            out["y"] = ytrain
+
+            if not no_output:
+                out["y"] = ytrain
+
             out["index"] = index_train
 
             torch.save(
@@ -540,7 +554,10 @@ class NCDataConstructor:
             index_val = index[~mask]
 
             out["x"] = xval
-            out["y"] = yval
+
+            if not no_output:
+                out["y"] = yval
+
             out["index"] = index_val
 
             torch.save(
@@ -552,6 +569,9 @@ class NCDataConstructor:
             )
 
         else:
+            if no_output:
+                out.pop("y")
+
             torch.save(
                 out,
                 os.path.join(
@@ -561,11 +581,11 @@ class NCDataConstructor:
             )
 
     def get_input_index(self, dataset):
-        if self.input_index is not None:
+        if self.input_index is None:
             self.input_index = self.get_variable_index(dataset, self.inputs)
 
     def get_output_index(self, dataset):
-        if self.output_index is not None:
+        if self.output_index is None:
             self.output_index = self.get_variable_index(dataset, self.outputs)
 
     def get_variable_index(self, dataset, variable_names):
@@ -648,7 +668,7 @@ class NCDataConstructor:
     def read_disk_file(self, file):
         return netCDF4_Dataset(file, "r", format="NETCDF4")
 
-    def load_file(self, file, cache_file = None):
+    def load_file(self, file, cache_file=None):
 
         try:
             dataset = self.read_data(file)
@@ -672,7 +692,6 @@ class NCDataConstructor:
                 return cache_file
 
             return x, y, new_index
-
 
         except Exception as e:
             logger.exception(e)
@@ -698,8 +717,6 @@ class NCDataConstructor:
         return xi, yi, shuffled_index
 
     def load_files(self, files, save_file=None):
-
-        
 
         x = []
         y = []
@@ -738,11 +755,10 @@ class NCDataConstructor:
             torch.save(out, save_file)
 
         return out
-        
 
     def load_files_parallel(self, files, num_workers=8, save_file=None):
         x = []
-        y = [] 
+        y = []
         index = []
 
         # def load_file_wrapper(*args,**kwargs):
@@ -757,39 +773,38 @@ class NCDataConstructor:
 
         os.makedirs(self.cache, exist_ok=True)
 
-        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache,"*"))):
+        for f in tqdm.tqdm(glob.glob(os.path.join(self.cache, "*"))):
             os.remove(f)
 
         logger.info("downloading files")
 
         with ProcessPoolExecutor(max_workers=num_workers) as exec:
 
-           
+            cache_files = [
+                os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))
+            ]
 
-            cache_files = [os.path.join(self.cache, f"{i:06}_cache.pt") for i in range(len(files))]
+            futs = []
 
-            futs  = []
-
-            for f,cf in zip(files,cache_files):
+            for f, cf in zip(files, cache_files):
                 if os.path.exists(cf):
-                    #skip and continue
+                    # skip and continue
                     continue
-                fut = exec.submit(self.load_file,f,cf)
+                fut = exec.submit(self.load_file, f, cf)
                 futs.append(fut)
 
-            for fut in tqdm.tqdm(as_completed(futs),total = len(files)):
+            for fut in tqdm.tqdm(as_completed(futs), total=len(files)):
                 try:
                     fut.result()
                 except Exception as e:
                     logger.exception(e)
 
-            
         logger.info("merging files")
 
         for f in tqdm.tqdm(sorted(cache_files)):
             if os.path.exists(f):
                 try:
-                    xi,yi,indexi = torch.load(f)
+                    xi, yi, indexi = torch.load(f)
                 except Exception as e:
                     logger.exception(e)
                     logger.warning(f"failed {f}")
@@ -800,7 +815,6 @@ class NCDataConstructor:
             x.append(xi)
             y.append(yi)
             index.append(indexi)
-            
 
         x = torch.cat(x)
         y = torch.cat(y)
@@ -828,10 +842,10 @@ class NCDataConstructor:
         for f in tqdm.tqdm(sorted(cache_files)):
             if os.path.exists(f):
                 os.remove(f)
-                
+
         return out
 
-    def get_stats(self,x):
+    def get_stats(self, x):
         logger.info(f"computing stats for tensor of shape {x.shape}")
         outs = dict()
 
@@ -841,7 +855,6 @@ class NCDataConstructor:
             channel_dim = 2
 
         reduce_dims = [i for i in range(len(x.shape)) if i != channel_dim]
-        
 
         outs["mean"] = x.mean(dim=reduce_dims)
         outs["std"] = x.std(dim=reduce_dims)
@@ -850,91 +863,37 @@ class NCDataConstructor:
         return outs
 
 
-def get_dataset_v1(
-    files=None,
-    subsample_factor=12,
-    batch_size=1024,
-    shuffle=False,
-    in_memory=True,
-    flatten=True,
-    compute_stats=True,
-    flatten_anyway=False,
-    inputs=None,
-    outputs=None,
-    split_fraction=None,
-):
+def unravel_index(flat_index, shape):
+    # flat_index = operator.index(flat_index)
+    res = []
 
-    if not in_memory:
-        raise ValueError
+    # Short-circuits on zero dim tensors
+    if shape == torch.Size([]):
+        return 0
 
-    dataset_dict = NcIterableDataset(
-        files,
-        max_files_in_memory=1,
-        batch_size=24,
-        shuffle=False,
-        flatten=flatten,  # False  -> use "globe" images
-        inputs=inputs,
-        outputs=outputs,
-        subsample_factor=subsample_factor,
-        compute_stats=compute_stats,
-    ).get_tensors(cache_dir="/ssddg1/gaia/cache")
+    for size in shape[::-1]:
+        res.append(flat_index % size)
+        flat_index = flat_index // size
 
-    del dataset_dict["index"]
+    # return torch.cat(res
 
-    if flatten_anyway:
-        logger.warning("flattening dataset")
-        for v in ["x", "y"]:
-            dataset_dict[v] = (
-                dataset_dict[v]
-                .permute([0, 2, 3, 1])
-                .reshape(-1, dataset_dict[v].shape[1])
-            )
+    if len(res) == 1:
+        return res[0]
 
-    if split_fraction is not None:
-        logger.info("making val set by splitting train set in a truly random fashion")
-        mask_train = torch.rand(dataset_dict["x"].shape[0]) >= split_fraction
-
-        data_loader_train = DataLoader(
-            FastTensorDataset(
-                dataset_dict["x"][mask_train],
-                dataset_dict["y"][mask_train],
-                batch_size=batch_size,
-                shuffle=shuffle,
-            ),
-            batch_size=None,
-            pin_memory=True,
-        )
-
-        data_loader_test = DataLoader(
-            FastTensorDataset(
-                dataset_dict["x"][~mask_train],
-                dataset_dict["y"][~mask_train],
-                batch_size=batch_size,
-                shuffle=False,
-            ),
-            batch_size=None,
-            pin_memory=True,
-        )
-
-        return dataset_dict, data_loader_train, data_loader_test
-
-    data_loader = DataLoader(
-        FastTensorDataset(
-            dataset_dict["x"], dataset_dict["y"], batch_size=batch_size, shuffle=shuffle
-        ),
-        batch_size=None,
-        pin_memory=True,
-    )
-
-    return dataset_dict, data_loader
+    return res[::-1]
 
 
 def get_dataset(
     dataset_file,
     batch_size=1024,
     flatten=False,
-    shuffle = False,
-    var_index_file = None
+    shuffle=False,
+    var_index_file=None,
+    include_index=False,
+    subsample=1,
+    space_filter=None,
+    inputs=None,
+    outputs=None,
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -942,24 +901,172 @@ def get_dataset(
     # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
     var_index = torch.load(var_index_file)
 
-    dataset_dict.update(var_index)
+    if (inputs is not None) or (outputs is not None):
 
-    del dataset_dict["index"]
+        assert len(dataset_dict["x"].shape) in [3, 5]
+
+        logger.info("constructing custom inputs from datasets")
+
+        common_index = var_index["input_index"]
+        common_stats = dataset_dict["stats"]["input_stats"]
+        common_data = dataset_dict["x"]
+
+        if "y" in dataset_dict:
+            logger.info("found y... merging with x")
+            channel_dim = 2
+            D = common_data.shape[channel_dim]
+
+            common_data = torch.cat([common_data, dataset_dict["y"]], dim=channel_dim)
+
+            for k, v in var_index["output_index"].items():
+                s, e = v
+                common_index[k] = [s + D, e + D]
+
+            for k, v in dataset_dict["stats"]["output_stats"].items():
+                common_stats[k] = torch.cat([common_stats[k], v])
+
+        def _make_one(names, time_index):
+            stats = defaultdict(list)
+            index = OrderedDict()
+            data = []
+            current_index = 0
+
+            for n in names:
+                s, e = common_index[n]
+                d = e - s
+                data.append(common_data[:, time_index, s:e, ...])
+
+                for k, v in common_stats.items():
+                    stats[k].append(v[s:e, ...])
+
+                index[n] = [current_index, current_index + d]
+                current_index = current_index + d
+
+            data = torch.cat(data, dim=1)
+
+            for k in list(stats.keys()):
+                stats[k] = torch.cat(stats[k])
+
+            return data, dict(stats), index
+
+        logger.info("creating input")
+
+        d, s, i = _make_one(inputs, 0)
+        dataset_dict["x"] = d
+        dataset_dict["input_index"] = i
+        dataset_dict["stats"]["input_stats"] = s
+
+        logger.info("creating output")
+
+        d, s, i = _make_one(outputs, 1)
+        dataset_dict["y"] = d
+        dataset_dict["output_index"] = i
+        dataset_dict["stats"]["output_stats"] = s
+
+    else:
+
+        logger.info("assuming default inputs")
+
+        dataset_dict.update(var_index)
+
+        assert len(dataset_dict["x"].shape) in [3, 5]
+
+        logger.warn("inputs are time step 0 and outputs are at timestep 1")
+
+        dataset_dict["x"] = dataset_dict["x"][:, 0, ...]
+        dataset_dict["y"] = dataset_dict["y"][:, 1, ...]
 
     if flatten:
         logger.warning("flattening dataset")
         for v in ["x", "y"]:
             dataset_dict[v] = flatten_tensor(dataset_dict[v])
 
+    tensor_list = [dataset_dict["x"], dataset_dict["y"]]
+
+    if include_index or (space_filter is not None):
+        # TODO dont hard code this
+        num_ts, num_lats, num_lons = 8, 96, 144
+        logger.warning(
+            f"using hardcoded expected shape for unraveling the index: {num_ts,num_lats,num_lons}"
+        )
+
+        if flatten:
+
+            # index is flattened
+            # shape = dataset_dict["x"].shape
+            # if len(dataset_dict["x"].shape) == 3:
+            #     samples, timesteps, channels = dataset_dict["x"].shape
+            # else:
+            #     samples, channels = dataset_dict["x"].shape
+
+            num_samples = dataset_dict["index"].shape[0]
+
+            lats = (
+                torch.ones(num_samples, 1, num_lons)
+                * torch.arange(num_lats)[None, :, None]
+            )
+            lons = (
+                torch.ones(num_samples, num_lats, 1)
+                * torch.arange(num_lons)[None, None, :]
+            )
+            index = torch.cat(
+                [lats.ravel().long()[:, None], lons.ravel().long()[:, None]], dim=-1
+            )
+        else:
+            index = unravel_index(
+                dataset_dict["index"], shape=[num_ts, num_lats, num_lons]
+            )
+            index = torch.cat(
+                [i[:, None] for i in index[1:]], dim=-1
+            )  # just want lats, lons
+
+    else:
+        del dataset_dict["index"]
+
+    if include_index:
+        tensor_list += [index]
+
+    if space_filter is not None:
+        # filter out dataset
+
+        logger.info(f"applying space filter {space_filter}")
+
+        from gaia.plot import lats as lats_vals
+        from gaia.plot import lons as lons_vals
+
+        lats_vals = torch.tensor(lats_vals)
+        lons_vals = torch.tensor(lons_vals)
+
+        mask = torch.ones(len(tensor_list[0])).bool()
+
+        if "lat_bounds" in space_filter:
+            lat_min, lat_max = space_filter["lat_bounds"]
+            temp = lats_vals[index[:, 0]]
+            mask = mask & (temp <= lat_max) & (temp >= lat_min)
+
+        if "lon_bounds" in space_filter:
+            lon_min, lon_max = space_filter["lon_bounds"]
+            temp = lons_vals[index[:, 1]]
+            mask = mask & (temp <= lon_max) & (temp >= lon_min)
+
+        assert mask.any()
+
+        tensor_list = [t[mask, ...] for t in tensor_list]
+
+    if subsample > 1:
+        tensor_list = [t[::subsample, ...] for t in tensor_list]
+        logger.info(f"subsampling by factor of {subsample}")
+
+    logger.info(f"data size {len(tensor_list[0])}")
+
     data_loader = DataLoader(
-        FastTensorDataset(
-            dataset_dict["x"], dataset_dict["y"], batch_size=batch_size, shuffle=shuffle
-        ),
+        FastTensorDataset(*tensor_list, batch_size=batch_size, shuffle=shuffle),
         batch_size=None,
         pin_memory=True,
     )
 
     return dataset_dict, data_loader
+
 
 class FastTensorDataset(IterableDataset):
     """
@@ -1130,8 +1237,3 @@ class NcDatasetMem(Dataset):
 
 def make_dummy_dataset():
     return TensorDataset(torch.randn(10000, 26 * 2), torch.randn(10000, 26 * 2))
-
-
-
-
-

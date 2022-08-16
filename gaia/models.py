@@ -1,15 +1,17 @@
-from asyncio.log import logger
 from collections import OrderedDict
 from math import ceil
 from turtle import forward
-from typing import List
+from typing import List, ValuesView
 from cv2 import normalize
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (
+    Conv2dDS,
+    FCLayer,
     InterpolateGrid1D,
+    MultiIndexEmbedding,
     Normalization,
     ResDNNLayer,
     make_interpolation_weights,
@@ -19,6 +21,9 @@ import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
+from gaia import get_logger
+
+logger = get_logger(__name__)
 
 
 class TrainingModel(LightningModule):
@@ -37,7 +42,7 @@ class TrainingModel(LightningModule):
         ignore_input_variables=None,
         interpolate=None,
         predict_hidden_states=False,
-        lr_schedule = None,
+        lr_schedule=None,
         **kwargs,
     ):
         super().__init__()
@@ -76,12 +81,14 @@ class TrainingModel(LightningModule):
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
-        elif model_type == "conv":
-            self.model = ConvNet1x1(**model_config)
+        elif model_type == "conv2d":
+            self.model = ConvNet2D(**model_config)
         elif model_type == "fcn_history":
             self.model = FcnHistory(**model_config)
         elif model_type == "conv1d":
-            self.model = ConvNet1D(**model_config)
+            self.model = ConvNet1D(
+                input_index=input_index, output_index=output_index, **model_config
+            )
         elif model_type == "resdnn":
             self.model = ResDNN(**model_config)
         elif model_type == "encoderdecoder":
@@ -90,6 +97,8 @@ class TrainingModel(LightningModule):
             self.model = TransformerModel(
                 input_index=input_index, output_index=output_index, **model_config
             )
+        elif model_type == "fcn_with_index":
+            self.model = FcnWithIndex(**model_config)
         else:
             raise ValueError("unknown model_type")
 
@@ -230,15 +239,18 @@ class TrainingModel(LightningModule):
                         int(0.1 * self.trainer.estimated_stepping_batches),
                         self.trainer.estimated_stepping_batches,
                     ),
-                    "interval": "step"
+                    "interval": "step",
                 }
             else:
                 raise ValueError(f"unknown lr scheduler {self.hparams.lr_schedule}")
 
         return out
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, x, index=None):
+        if index is not None:
+            return self.model(x, index=index)
+        else:
+            return self.model(x)
 
     def select_input_variables(self, x):
         if self.hparams.ignore_input_variables is None:
@@ -247,7 +259,14 @@ class TrainingModel(LightningModule):
             return x[:, self.input_variable_index, ...]
 
     def handle_batch(self, batch):
-        x, y = batch
+
+        x, y = batch[:2]
+
+        index = None
+
+        if len(batch) > 2:
+            index = batch[2]
+
         num_dims = len(x.shape)
 
         if num_dims == 3 or num_dims == 5:
@@ -271,11 +290,11 @@ class TrainingModel(LightningModule):
                 if self.hparams.memory_variables is not None:
                     # not using all variables for history
                     y1 = y1[:, self.memory_variable_index, ...]
-                return [x, y1], y2
+                res = [x, y1], y2
             else:
                 # dont use history
 
-                return x, y2
+                res = x, y2
 
         else:
 
@@ -288,14 +307,16 @@ class TrainingModel(LightningModule):
 
             x = self.select_input_variables(x)
 
-            return x, y
+            res = x, y
+
+        return res + (index,)
 
     def step(self, batch, mode="train"):
         # x, y = batch
         # x = self.input_normalize(x)
         # y = self.output_normalize(y)
 
-        x, y = self.handle_batch(batch)
+        x, y, index = self.handle_batch(batch)
 
         if len(y.shape) == 2:
             reduce_dims = [0]
@@ -304,7 +325,7 @@ class TrainingModel(LightningModule):
         else:
             raise ValueError("wrong size of x")
 
-        yhat = self(x)
+        yhat = self(x, index=index)
 
         if self.hparams.interpolate is not None:
             yhat = self.interpolate_model_to_data_output(yhat)
@@ -340,7 +361,14 @@ class TrainingModel(LightningModule):
                         loss[loss_name] = skill[i]
 
         if self.hparams.loss_output_weights is not None:
-            mse = mse * self.loss_output_weights[None, :]
+
+            num_dims = len(mse.shape)
+            if num_dims == 4:
+                mse = mse * self.loss_output_weights[None, :, None, None]
+            elif num_dims == 2:
+                mse = mse * self.loss_output_weights[None, :]
+            else:
+                raise ValueError("wrong number of dims in mse")
 
         loss["mse"] = mse.mean()
         for k, v in loss.items():
@@ -382,9 +410,18 @@ class FcnBaseline(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        use_index = False,
         model_type=None,
     ):
         super().__init__()
+
+        if use_index:
+            # add lon/lat as an additional input
+            from gaia.plot import lats, lons
+            self.register_buffer("lats",torch.tensor(lats)/90.)
+            self.register_buffer("lons",torch.tensor(lons)/180.)
+            input_size = input_size+2
+
         self.hidden_size = hidden_size
         self.input_size = input_size
         self.output_size = output_size
@@ -392,6 +429,7 @@ class FcnBaseline(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.model = self.make_model()
+        
 
     def make_model(self):
         if self.num_layers == 1:
@@ -415,8 +453,75 @@ class FcnBaseline(torch.nn.Module):
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, x, index = None):
+        if index is None:
+            return self.model(x)
+        else:
+            lats = self.lats[index[:,0]]
+            lons = self.lons[index[:,1]]
+            x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
+            return self.model(x)
+
+
+class FcnWithIndex(torch.nn.Module):
+    def __init__(
+        self,
+        input_size: int = 26 * 2,
+        num_layers: int = 7,
+        hidden_size: int = 512,
+        output_size: int = 26 * 2,
+        dropout: float = 0.01,
+        leaky_relu: float = 0.15,
+        index_shape=None,
+        model_type=None,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.output_size = output_size
+        self.dropout = dropout
+        self.leaky_relu = leaky_relu
+        self.num_layers = num_layers
+        self.index_shape = index_shape
+
+        self.layers = torch.nn.ModuleList(self.make_model())
+
+    def make_model(self):
+        if self.num_layers == 1:
+            return [FCLayer(
+                self.input_size, self.output_size, index_shape=self.index_shape
+            )]
+
+        input_layer = FCLayer(
+            self.input_size,
+            self.hidden_size,
+            batch_norm=True,
+            dropout=self.dropout,
+            leaky_relu=self.leaky_relu,
+            index_shape=self.index_shape,
+        )
+
+        intermediate_layers = [
+            FCLayer(
+                self.hidden_size,
+                self.hidden_size,
+                batch_norm=True,
+                dropout=self.dropout,
+                leaky_relu=self.leaky_relu,
+                index_shape=self.index_shape,
+            )
+            for _ in range(self.num_layers - 2)
+        ]
+        output_layer = FCLayer(
+            self.hidden_size, self.output_size, index_shape=self.index_shape
+        )
+        layers = [input_layer] + intermediate_layers + [output_layer]
+        return layers
+
+    def forward(self, x, index = None):
+        for layer in self.layers:
+            x = layer(x,index = index)
+        return x
 
 
 class EncoderDecoder(torch.nn.Module):
@@ -429,6 +534,8 @@ class EncoderDecoder(torch.nn.Module):
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
         bottleneck_dim: int = 32,
+        encoder_layers=None,
+        index_shape=None,
         model_type=None,
     ):
         super().__init__()
@@ -440,9 +547,10 @@ class EncoderDecoder(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.bottleneck_dim = bottleneck_dim
-        self.scale = 8
+        self.scale = 1
+        if encoder_layers is None:
+            encoder_layers = ceil(self.num_layers / 2)
 
-        encoder_layers = ceil(self.num_layers / 2)
         decoder_layers = self.num_layers - encoder_layers
 
         self.encoder = FcnBaseline(
@@ -463,8 +571,21 @@ class EncoderDecoder(torch.nn.Module):
             leaky_relu=leaky_relu,
         )
 
-    def forward(self, x, return_hidden_state=False):
+        if index_shape is not None:
+            self.index_embedding_scale = MultiIndexEmbedding(
+                bottleneck_dim, index_shape, init_value=1.0
+            )
+            self.index_embedding_bias = MultiIndexEmbedding(
+                bottleneck_dim, index_shape, init_value=0.0
+            )
+
+    def forward(self, x, return_hidden_state=False, index=None):
         b = self.encoder(x)
+
+        if index is not None:
+            scale = self.index_embedding_scale(index)
+            bias = self.index_embedding_bias(index)
+            b = b * scale + bias
 
         if self.scale > 1 and not self.training:
             b = unflatten_tensor(b)
@@ -507,8 +628,8 @@ class ResDNN(torch.nn.Module):
         def make_layer(ins, outs):
             layer = torch.nn.Sequential(
                 torch.nn.Linear(ins, outs),
-                # torch.nn.BatchNorm1d(outs),
-                # torch.nn.Dropout(self.dropout),
+                torch.nn.BatchNorm1d(outs),
+                torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
             )
 
@@ -827,7 +948,7 @@ class TransformerModel(torch.nn.Module):
         return y
 
 
-class ConvNet1x1(torch.nn.Module):
+class ConvNet2D(torch.nn.Module):
     def __init__(
         self,
         input_size=26 * 2,
@@ -836,6 +957,8 @@ class ConvNet1x1(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
+        kernel_size: int = 3,
+        conv_type: str = "conv2d",
         model_type=None,
     ):
         super().__init__()
@@ -846,13 +969,24 @@ class ConvNet1x1(torch.nn.Module):
         self.dropout = dropout
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
-
+        self.kernel_size = kernel_size
+        self.conv_type = conv_type
         self.model = self.make_model()
 
     def make_model(self):
+        if self.conv_type == "conv2d":
+            conv = torch.nn.Conv2d
+        elif self.conv_type == "conv2d_ds":
+            conv = Conv2dDS
+        else:
+            raise ValueError(f"unknown {self.conv_typ}")
+
         def make_layer(ins, outs):
+
             layer = torch.nn.Sequential(
-                torch.nn.Conv2d(ins, outs, kernel_size=1, bias=False),
+                conv(
+                    ins, outs, kernel_size=self.kernel_size, bias=True, padding="same"
+                ),
                 torch.nn.BatchNorm2d(outs),
                 torch.nn.Dropout(self.dropout),
                 torch.nn.LeakyReLU(self.leaky_relu),
@@ -864,9 +998,14 @@ class ConvNet1x1(torch.nn.Module):
             make_layer(self.hidden_size, self.hidden_size)
             for _ in range(self.num_layers - 2)
         ]
-        output_layer = torch.nn.Conv2d(
-            self.hidden_size, self.output_size, kernel_size=1, bias=True
+        output_layer = conv(
+            self.hidden_size,
+            self.output_size,
+            kernel_size=self.kernel_size,
+            padding="same",
+            bias=True,
         )
+
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 

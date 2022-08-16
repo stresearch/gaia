@@ -9,6 +9,7 @@ import re
 logger = get_logger(__name__)
 
 class Config():
+    valid_top_level = ["mode","seed","interpolation_params","dataset_params" ,"trainer_params","model_params" ]
     """
     Initialize config with default parameter
     then parse cli args and merge
@@ -18,31 +19,42 @@ class Config():
         Set default model parameters
         """
         # set general params (mode, seed, etc.)
-        self.mode = 'train,val,test'
-        self.seed = True
-        self.interpolation_params = None
+
+        for k in cli_args:
+            if k not in self.valid_top_level:
+                logger.warn(f"{k} invalid top level param category, ignoring")
+                cli_args.pop(k)
+
+        mode = 'train,val,test'
+        seed = True
+        interpolation_params = None
         
         # set trainer params 
-        self.trainer_params = self.set_trainer_params(cli_args)
+        trainer_params = self.set_trainer_params(cli_args)
         
         # set dataset params
-        self.dataset_params = self.set_dataset_params(cli_args)
+        dataset_params = self.set_dataset_params(cli_args)
         
         # set model params
-        self.model_params = self.set_model_params(cli_args)
+        model_params = self.set_model_params(cli_args)
                 
         # general config
-        self.config = dict(
-            mode = self.mode,
-            trainer_params = self.trainer_params,
-            dataset_params = self.dataset_params,
-            model_params = self.model_params,
-            seed = self.seed,
-            interpolation_params = self.interpolation_params,
+        config = dict(
+            mode = mode,
+            trainer_params = trainer_params,
+            dataset_params = dataset_params,
+            model_params = model_params,
+            seed = seed,
+            interpolation_params = interpolation_params,
         )
-        logger.info(f"Config: \n{yaml.dump(self.config, indent=2)}")
+        self.config = merge(config, cli_args)
 
-        
+        logger.info(f"Config: \n{self}")
+
+
+    def __repr__(self) -> str:
+        return yaml.dump(self.config, indent=2)
+
     @classmethod
     def readCLIargs(cls):
         """
@@ -63,22 +75,47 @@ class Config():
             precision=16,
             max_epochs=200
         )
-        return merge(default_trainer_params, cli_args.get('trainer_params',{}))
+        return default_trainer_params
+        # return merge(default_trainer_params, cli_args.get('trainer_params',{}))
     
     @staticmethod
     def set_dataset_params(cli_args=dict()):
         """
         Set the dataset params
         """
-        dataset_paths = {
-            "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
-            "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
-        }
-        dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
-        base = dataset_paths[dataset]
-        mean_thres_defaults = {"cam4": 1e-13, "spcam": 1e-15}
+        base = cli_args.get('dataset_params',{}).get("prefix",None)
+
+        if base is None:
+            dataset_paths = {
+                "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
+                "cam4_fixed": "/ssddg1/gaia/fixed/cam4-famip-30m-timestep_4",
+                "cam4_v2": "/ssddg1/gaia/cam4_v2/cam4-famip-30m-timestep-second-upload",
+                "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
+                "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
+                "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
+                "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
+            }
+
+            dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
+            base = dataset_paths[dataset]
+            
+        if "cam4" in dataset:
+            mean_thres = 1e-13
+        elif "spcam" in dataset:
+            mean_thres = 1e-15
+        else:
+            raise ValueError(f"unknown dataset {dataset}")
+
         var_index_file = base + "_var_index.pt"
+
+        #possibly shared params
+
         batch_size = cli_args.get('dataset_params',{}).get("batch_size",24 * 96 * 144)
+        include_index = cli_args.get('dataset_params',{}).get("include_index",False)
+        subsample = cli_args.get('dataset_params',{}).get("subsample",1)
+        space_filter = cli_args.get('dataset_params',{}).get("space_filter",None)
+        inputs = cli_args.get('dataset_params',{}).get("inputs",None)
+        outputs = cli_args.get('dataset_params',{}).get("outputs",None)
         
         dataset_params = dict(
             train=dict(
@@ -86,39 +123,57 @@ class Config():
                 batch_size=batch_size,
                 shuffle=True,
                 flatten=False,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=False,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
             test=dict(
-                dataset_file=base+'_var_index.pt',
+                dataset_file=base+'_test.pt',
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened
-                var_index_file=var_index_file
+                var_index_file=var_index_file,
+                include_index = include_index,
+                subsample = subsample,
+                space_filter =space_filter,
+                inputs = inputs,
+                outputs = outputs
             ),
-            mean_thres=mean_thres_defaults[dataset]
+            mean_thres=mean_thres
         )
-        return merge(dataset_params, cli_args.get('dataset_params',{}))
+        return dataset_params
+        # return merge(dataset_params, cli_args.get('dataset_params',{}))
     
     @staticmethod
     def set_model_params(cli_args=dict()):
         model_config = model_type_lookup(cli_args.get('model_params',{}).get('model_type', 'fcn'))
         model_params = dict(
-            memory_varaibles=None,      # can be ',' sep
+            memory_variables=None,      # can be ',' sep
             ignore_input_variables=None,# can be ',' sep
             model_config = model_config,
             lr=1e-3,
             use_output_scaling=False,
             replace_std_with_range=False,
             ckpt=None,
+            lr_schedule = "cosine"
         )
-        return merge(model_params, cli_args.get('model_params',{}))
+        return model_params
+        # return merge(model_params, cli_args.get('model_params',{}))
 
     
 def model_type_lookup(model_type):
@@ -149,6 +204,14 @@ def model_type_lookup(model_type):
             "hidden_size": 128
         }
 
+    elif model_type == "conv2d":
+        model_config = {
+            "model_type": "conv2d",
+            "num_layers": 7,
+            "hidden_size": 176,
+            "kernel_size": 3,
+        }
+
     elif model_type == "resdnn":
         model_config = {
             "model_type": "resdnn",
@@ -171,6 +234,14 @@ def model_type_lookup(model_type):
             "model_type": "transformer",
             "num_layers": 3,
             "hidden_size": 128,
+        }
+    elif model_type == "fcn_with_index":
+        model_config = {
+            "model_type": "fcn_with_index",
+            "num_layers": 7,
+            "hidden_size": 512,
+            "dropout": 0.01,
+            "leaky_relu": 0.15
         }
     else:
         raise ValueError

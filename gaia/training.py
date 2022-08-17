@@ -45,17 +45,26 @@ def get_checkpoint_file(file):
 
 
 def update_model_params_from_dataset(
-    dataset_dict, model_params, mean_thres=1e-13, levels=None
+    dataset_dict, 
+    model_params, 
+    dataset_params,
+    mean_thres=1e-13, 
+    levels=None
 ):
-
+    input_size = dataset_dict["x"].shape[-1]
+    output_size = dataset_dict["y"].shape[-1]
     model_params["model_config"].update(
         {
-            "input_size": list(dataset_dict["input_index"].values())[-1][-1], #ordered dict of {"var":(s,e)}
-            "output_size": list(dataset_dict["output_index"].values())[-1][-1],
+            # "input_size": list(dataset_dict["input_index"].values())[-1][-1], #ordered dict of {"var":(s,e)}
+            # "output_size": list(dataset_dict["output_index"].values())[-1][-1],
+            "input_size": input_size,
+            "output_size": output_size
         }
     )
 
+    dataset_params["y_vars"]
     model_params.update(
+        # TODO: check if this needs to be changed
         dict(
             input_index=dataset_dict["input_index"],
             output_index=dataset_dict["output_index"],
@@ -139,6 +148,7 @@ def main(
         update_model_params_from_dataset(
             train_dataset,
             model_params,
+            dataset_params["train"],
             mean_thres=mean_thres,
             levels=get_levels(dataset_name),
         )

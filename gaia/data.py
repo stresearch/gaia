@@ -951,11 +951,58 @@ def unravel_index(flat_index, shape):
   
      return res[::-1]
 
-
+def limit_dataset_vars(dataset_dict, var_index, x_vars, y_vars):            
+    """
+    Limit input and output variables in the dataset_dict to match
+    x_vars and y_vars
+    """    
+    if x_vars:
+        keep_x_inds = [var_ind for var_ind in var_index['input_index'].items() if var_ind[0] in x_vars]
+        keep_x_inds = sum([list(range(t[1][0],t[1][1])) for t in keep_x_inds], [])
+    else:
+        keep_x_inds = list(range(0,dataset_dict['x'].shape[2]))
+        
+    if y_vars:
+        keep_y_inds = [var_ind for var_ind in var_index['output_index'].items() if var_ind[0] in y_vars]
+        keep_y_inds = sum([list(range(t[1][0],t[1][1])) for t in keep_y_inds], [])
+    else:
+        keep_y_inds = list(range(0,dataset_dict['y'].size[2]))
+    
+    # x, y
+    dataset_dict['x'] = dataset_dict['x'][:,:,keep_x_inds,...]
+    dataset_dict['y'] = dataset_dict['y'][:,:,keep_y_inds,...]
+    
+    # stats
+    for stat in ['mean', 'std', 'min', 'max']:
+        dataset_dict['stats']['input_stats'][stat] = dataset_dict['stats']['input_stats'][stat][keep_x_inds]
+        dataset_dict['stats']['output_stats'][stat] = dataset_dict['stats']['output_stats'][stat][keep_y_inds]
+        
+    # index
+    if x_vars:
+        var_index['input_index'] = OrderedDict(var_ind for var_ind in var_index['input_index'].items()
+                        if var_ind[0] in x_vars)
+        s = 0
+        index_size = [v[1] - v[0] for v in var_index['input_index'].values()]
+        for i, key in enumerate(var_index['input_index'].keys()):
+            var_index['input_index'][key] = [s, s + index_size[i]]
+            s = s + index_size[i]
+            
+    if y_vars:
+        var_index['output_index'] = OrderedDict(var_ind for var_ind in var_index['output_index'].items()
+                        if var_ind[0] in y_vars)
+        s = 0
+        index_size = [v[1] - v[0] for v in var_index['output_index'].values()]
+        for i, key in enumerate(var_index['output_index'].keys()):
+            var_index['output_index'][key] = [s, s + index_size[i]]
+            s = s + index_size[i]
+    
+    return dataset_dict, var_index
 
 
 def get_dataset(
     dataset_file,
+    x_vars = None,
+    y_vars = None,
     batch_size=1024,
     flatten=False,
     shuffle = False,
@@ -969,10 +1016,10 @@ def get_dataset(
 
     # var_index = torch.load("/ssddg1/gaia/spcam/var_index.pt")
     var_index = torch.load(var_index_file)
-
-    dataset_dict.update(var_index)
-
     
+    dataset_dict, var_index = limit_dataset_vars(dataset_dict, var_index, x_vars, y_vars)
+    
+    dataset_dict.update(var_index)
 
     if flatten:
         logger.warning("flattening dataset")

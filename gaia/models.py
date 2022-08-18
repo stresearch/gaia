@@ -45,6 +45,7 @@ class TrainingModel(LightningModule):
         use_batch_norm_for_norm = False,
         fine_tuning = False,
         loss = "mse",
+        zero_outputs = True,
         **kwargs,
     ):
         super().__init__()
@@ -89,6 +90,8 @@ class TrainingModel(LightningModule):
             # w = torch.tensor(loss_output_weights)
             # w *= w.shape[0] / w.sum()
             self.make_output_weights(loss_output_weights)
+        else:
+            self.hparams.zero_output = False          
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -200,9 +203,14 @@ class TrainingModel(LightningModule):
 
     def forward(self, x, index=None):
         if index is not None:
-            return self.model(x, index=index)
+            y = self.model(x, index=index)
         else:
-            return self.model(x)
+            y = self.model(x)
+
+        if self.hparams.zero_outputs:
+            y = y.masked_fill_(self.loss_output_weights[None,:] == 0,0.)
+
+        return y
 
     def handle_batch(self, batch):
 

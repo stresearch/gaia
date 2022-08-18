@@ -47,61 +47,66 @@ class ModelForExport(torch.nn.Module):
 
         # check if we need to pass thru any inputs
 
-        not_in_output = set(output_order) - set(
-            training_model.hparams.output_index.keys()
-        )
+        if output_order is not None:
 
-        self.need_pass_thru = False
-        if len(not_in_output) > 0:
-            if not_in_output.issubset(set(training_model.hparams.input_index.keys())):
-                logger.info(
-                    f"{not_in_output} not found in output but found in input... assuming pass thru vars"
-                )
-                self.need_pass_thru = True
-            else:
-                raise ValueError(f"{not_in_output} not found in input or output")
-        
+            not_in_output = set(output_order) - set(
+                training_model.hparams.output_index.keys()
+            )
 
-        if self.need_pass_thru:
-            # concat (optionally reordered) input and output and then reorder
-            # dim of input
-            input_size = list(training_model.hparams.input_index.values())[-1][-1]
-            self.reorder_output = True
-            index_tensor = []
-            for k in output_order:
-                if k in training_model.hparams.output_index:
-                    s, e = training_model.hparams.output_index[k]
-                    # shift by size of input
-                    s = s + input_size
-                    e = e + input_size
-                elif k in training_model.hparams.input_index:
-                    s, e = training_model.hparams.input_index[k]
+            self.need_pass_thru = False
+            if len(not_in_output) > 0:
+                if not_in_output.issubset(set(training_model.hparams.input_index.keys())):
+                    logger.info(
+                        f"{not_in_output} not found in output but found in input... assuming pass thru vars"
+                    )
+                    self.need_pass_thru = True
                 else:
-                    raise ValueError(f"{k} is found in neither input nor output")
+                    raise ValueError(f"{not_in_output} not found in input or output")
+            
 
-                index_tensor.append(torch.arange(s, e))
+            if self.need_pass_thru:
+                # concat (optionally reordered) input and output and then reorder
+                # dim of input
+                input_size = list(training_model.hparams.input_index.values())[-1][-1]
+                self.reorder_output = True
+                index_tensor = []
+                for k in output_order:
+                    if k in training_model.hparams.output_index:
+                        s, e = training_model.hparams.output_index[k]
+                        # shift by size of input
+                        s = s + input_size
+                        e = e + input_size
+                    elif k in training_model.hparams.input_index:
+                        s, e = training_model.hparams.input_index[k]
+                    else:
+                        raise ValueError(f"{k} is found in neither input nor output")
 
-            order = torch.cat(index_tensor)
-            self.register_buffer("output_order", order)
+                    index_tensor.append(torch.arange(s, e))
+
+                order = torch.cat(index_tensor)
+                self.register_buffer("output_order", order)
+
+            else:
+                logger.info("dont need to pass thru anything")
+
+
+                if output_order is not None:
+                    if output_order == list(training_model.hparams.output_index.keys()):
+                        logger.info("outputs align... dont need to reorder")
+                        self.reorder_output = False
+                    order = torch.cat(
+                        [
+                            torch.arange(*training_model.hparams.output_index[k])
+                            for k in output_order
+                        ]
+                    )
+                    self.reorder_output = True
+                    self.register_buffer("output_order", order)
+                else:
+                    self.reorder_output = False
 
         else:
-            logger.info("dont need to pass thru anything")
-
-
-            if output_order is not None:
-                if output_order == list(training_model.hparams.output_index.keys()):
-                    logger.info("outputs align... dont need to reorder")
-                    self.reorder_output = False
-                order = torch.cat(
-                    [
-                        torch.arange(*training_model.hparams.output_index[k])
-                        for k in output_order
-                    ]
-                )
-                self.reorder_output = True
-                self.register_buffer("output_order", order)
-            else:
-                self.reorder_output = False
+            self.reorder_output = False
 
     def forward(self, x):
 

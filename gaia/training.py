@@ -117,6 +117,8 @@ def main(
         logger.info("seeding everything")
         pl.seed_everything(345)
 
+    model_dir = None
+
     logger.info("starting a run with:")
     # logger.info(f"trainer_params: \n{make_pretty_for_log(trainer_params)}")
     # logger.info(f"dataset_params: \n{make_pretty_for_log(dataset_params)}")
@@ -352,3 +354,6 @@ def main(
         #     other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)
+
+
+    return model_dir

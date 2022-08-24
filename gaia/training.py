@@ -130,6 +130,9 @@ def main(
 
         logger.info("**** TRAINING ******")
 
+        print(model_params.keys())
+        print(type(dataset_params))
+        print(dataset_params['train'])
         model_grid = model_params.get("model_grid", dataset_params["train"]["data_grid"])
 
         train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
@@ -296,7 +299,7 @@ def main(
         model_grid = model.hparams.get("model_grid", None)
         if model_grid is None:
             logger.info("model grid is not found... trying to infer from dataset")
-            dataset = model.hparams.dataset_params.get(dataset,None)
+            dataset = model.hparams.dataset_params.get('dataset', 'cam4')
             if dataset:
                 model_grid = get_levels(dataset)
 

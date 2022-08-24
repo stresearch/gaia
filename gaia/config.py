@@ -92,7 +92,7 @@ class Config():
         """
         # set general params (mode, seed, etc.)
 
-        for k in cli_args:
+        for k in list(cli_args):
             if k not in self.valid_top_level:
                 logger.warn(f"{k} invalid top level param category, ignoring")
                 cli_args.pop(k)

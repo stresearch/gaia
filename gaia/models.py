@@ -46,6 +46,7 @@ class TrainingModel(LightningModule):
         fine_tuning = False,
         loss = "mse",
         zero_outputs = True,
+        noise_sigma = 0,
         **kwargs,
     ):
         super().__init__()
@@ -248,6 +249,11 @@ class TrainingModel(LightningModule):
             reduce_dims = [0, 2, 3]
         else:
             raise ValueError("wrong size of x")
+
+        if self.training and (self.hparams.noise_sigma > 0):
+            noise = torch.randn_like(x)*self.hparams.noise_sigma
+            noise = noise.masked_fill(torch.rand_like(x)>.5, 0.)
+            x = x + noise
 
         yhat = self(x, index=index)
 

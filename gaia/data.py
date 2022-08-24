@@ -2,6 +2,7 @@ from math import prod
 from random import shuffle
 import shutil
 from typing import Union
+import copy
 from collections import OrderedDict, defaultdict
 import torch
 from torch.utils.data import (
@@ -910,9 +911,16 @@ def get_dataset(
     if (inputs is not None) or (outputs is not None):
 
         assert len(dataset_dict["x"].shape) in [3, 5]
+
+        # set to all io keys if not specified
+        if inputs is None:
+            inputs = list(var_index['input_index'].keys())
+        if outputs is None:
+            outputs = list(var_index['output_index'].keys())
+
         logger.info(f"constructing custom inputs from datasets: inputs: {inputs} outputs: {outputs}")
 
-        common_index = var_index["input_index"]
+        common_index = var_index["input_index"] # is this a pointer or something?
         common_stats = dataset_dict["stats"]["input_stats"]
         common_data = dataset_dict["x"]
 
@@ -923,6 +931,7 @@ def get_dataset(
 
             common_data = torch.cat([common_data, dataset_dict["y"]], dim=channel_dim)
 
+            # inputs changed here
             for k, v in var_index["output_index"].items():
                 s, e = v
                 common_index[k] = [s + D, e + D]

@@ -173,7 +173,7 @@ class Config():
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
             }
 
-            dataset = cli_args.get('dataset_params',{}).get('dataset', None)
+            dataset = cli_args.get('dataset_params',{}).get('dataset', 'cam4')
             base = dataset_paths[dataset]
             
         if "cam4" in dataset:

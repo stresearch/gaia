@@ -955,7 +955,7 @@ def limit_dataset_vars(dataset_dict, var_index, x_vars, y_vars):
     """
     Limit input and output variables in the dataset_dict to match
     x_vars and y_vars
-    """
+    """    
     if x_vars:
         keep_x_inds = [var_ind for var_ind in var_index['input_index'].items() if var_ind[0] in x_vars]
         keep_x_inds = sum([list(range(t[1][0],t[1][1])) for t in keep_x_inds], [])

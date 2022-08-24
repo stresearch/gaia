@@ -109,18 +109,15 @@ class Config():
         var_index_file = base + "_var_index.pt"
 
         #possibly shared params
+
         batch_size = cli_args.get('dataset_params',{}).get("batch_size",24 * 96 * 144)
         include_index = cli_args.get('dataset_params',{}).get("include_index",False)
         subsample = cli_args.get('dataset_params',{}).get("subsample",1)
         space_filter = cli_args.get('dataset_params',{}).get("space_filter",None)
-        x_vars = cli_args.get('dataset_params',{}).get("x_vars",None)
-        y_vars = cli_args.get('dataset_params',{}).get("y_vars",None)
         
         dataset_params = dict(
             train=dict(
                 dataset_file=base + "_train.pt",
-                x_vars = x_vars,
-                y_vars = y_vars,
                 batch_size=batch_size,
                 shuffle=True,
                 flatten=False,  # already flattened
@@ -131,8 +128,6 @@ class Config():
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
-                x_vars = x_vars,
-                y_vars = y_vars,
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=False,  # already flattened
@@ -143,8 +138,6 @@ class Config():
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
-                x_vars = x_vars,
-                y_vars = y_vars,
                 batch_size=batch_size,
                 shuffle=False,
                 flatten=True,  # already flattened

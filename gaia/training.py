@@ -117,6 +117,8 @@ def main(
         logger.info("seeding everything")
         pl.seed_everything(345)
 
+    model_dir = None
+
     logger.info("starting a run with:")
     # logger.info(f"trainer_params: \n{make_pretty_for_log(trainer_params)}")
     # logger.info(f"dataset_params: \n{make_pretty_for_log(dataset_params)}")
@@ -168,61 +170,49 @@ def main(
 
     if "finetune" in mode:
 
-        raise NotImplemented
-        # assuming we'll fine-tune on a different dataset
-        if model_params.get("pretrained", None) is not None:
-            logger.info(f"loading pretrained {model_params}")
-            pretrained = get_checkpoint_file(model_params["pretrained"])
-        else:
-            raise ValueError("need to specify pretrained to fine-tune")
+
+
+        logger.info("**** FINE TUNING ******")
+
+        if model_dir is None:
+            assert "ckpt" in model_params
+            model_dir = model_params["ckpt"]
+
+        model_params_to_update = {k:model_params[k] for k in ["lr","lr_schedule"]}
+        model_params_to_update["dataset_params"] = dataset_params
+        model_params_to_update["is_finetuned"] = True
+
+        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), fine_tuning = False, map_location="cpu", **model_params_to_update)
+
+
+        # disable everything but last later
+        # model.requires_grad_(False)
+        # model.model.model[-1].requires_grad_(True)
+
+        
+        model_grid = model.hparams.get("model_grid", None)
+
+        assert model_grid
+
+        train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
+        val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
+
+        assert train_dataset["input_index"] == model.hparams.input_index
+        assert train_dataset["output_index"] == model.hparams.output_index
 
         mean_thres = dataset_params["mean_thres"]
 
-        train_dataset, train_dataloader = get_dataset(**dataset_params["train"])
-        val_dataset, val_dataloader = get_dataset(**dataset_params["val"])
-
-        ## update interpolation params
-        interpolation_params = dict()
-        interpolation_params["input_grid"] = levels
-        interpolation_params["output_grid"] = levels26
-        interpolation_params["optimize"] = False
-        interpolation_params["model_config"] = dict()
-
-        update_model_params_from_dataset(
-            train_dataset, interpolation_params, mean_thres=mean_thres
-        )
-
-        model = TrainingModel.load_from_checkpoint(
-            pretrained, strict=False, **{"interpolate": interpolation_params}
-        )
-
-        # update output normalizaton
-        model.add_module(
-            "output_normalize",
-            model.get_normalization(
-                interpolation_params["data_stats"]["output_stats"], zero_mean=True
-            ),
-        )
-
-        # update output weights
-        model.make_output_weights(interpolation_params["loss_output_weights"])
-        model.hparams.loss_output_weights = interpolation_params["loss_output_weights"]
+        
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
         trainer = pl.Trainer(
-            callbacks=[checkpoint_callback],
+            callbacks=[checkpoint_callback, LearningRateMonitor()],
             log_every_n_steps=max(1, len(train_dataloader) // 100),
             **trainer_params,
         )
 
-        if model_params.get("ckpt", None) is not None:
-            logger.info(f"loading existing ckpt {model_params}")
-            ckpt = get_checkpoint_file(model_params["ckpt"])
-        else:
-            ckpt = None
-
-        trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
+        trainer.fit(model, train_dataloader, val_dataloader)
         model_dir = trainer.log_dir
 
     if "val" in mode:
@@ -296,7 +286,7 @@ def main(
         model_grid = model.hparams.get("model_grid", None)
         if model_grid is None:
             logger.info("model grid is not found... trying to infer from dataset")
-            dataset = model.hparams.dataset_params.get(dataset,None)
+            dataset = model.hparams.dataset_params.get("dataset",None)
             if dataset:
                 model_grid = get_levels(dataset)
 
@@ -305,14 +295,16 @@ def main(
             **dataset_params["test"], model_grid = model_grid
         )
 
-        trainer = pl.Trainer(
-            checkpoint_callback=False,
-            logger=False,
-            **trainer_params,
-        )
+        
 
         if "test" in mode:
             logger.info("**** TESTING ******")
+
+            trainer = pl.Trainer(
+            checkpoint_callback=False,
+            logger=False,
+            **trainer_params,
+            )
 
 
             test_results = trainer.test(model, dataloaders=test_dataloader)
@@ -362,3 +354,6 @@ def main(
         #     other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)
+
+
+    return model_dir

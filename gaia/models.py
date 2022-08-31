@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from math import ceil
+from multiprocessing import reduction
 from turtle import forward
 from typing import List, ValuesView
 from cv2 import normalize
@@ -39,23 +40,27 @@ class TrainingModel(LightningModule):
         use_output_scaling=False,
         replace_std_with_range=False,
         loss_output_weights=None,
-        memory_variables=None,
-        ignore_input_variables=None,
-        interpolate=None,
         predict_hidden_states=False,
         lr_schedule=None,
         use_batch_norm_for_norm = False,
+        fine_tuning = False,
+        loss = "mse",
+        zero_outputs = True,
+        noise_sigma = 0,
+        unit_normalize = False,
         **kwargs,
     ):
         super().__init__()
 
         if not isinstance(data_stats, str):
-            ignore = ["data_stats"]
+            ignore = ["data_stats", "fine_tuning"]
         else:
             ignore = None
 
         self.save_hyperparameters(ignore=ignore)
         model_type = model_config["model_type"]
+
+        self.fine_tuning = fine_tuning
 
         self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
 
@@ -87,37 +92,8 @@ class TrainingModel(LightningModule):
             # w = torch.tensor(loss_output_weights)
             # w *= w.shape[0] / w.sum()
             self.make_output_weights(loss_output_weights)
-
-        # if min_mean_thres is not None:
-        #     if loss_output_weights is not None:
-        #         raise ValueError("max_mean_threshold and loss_output_weights cant be both not None")
-        #     outputs_to_ignore = self.output_normalize.std
-
-        # if interpolate is not None:
-        #     logger.info(f"setting up interpolation")
-
-        #     do_optimize = interpolate["optimize"]
-
-        #     self.interpolate_data_to_model_input = InterpolateGrid1D(
-        #         input_grid=interpolate["input_grid"],
-        #         output_grid=interpolate["output_grid"],
-        #         input_grid_index=interpolate["input_index"],  # for the data
-        #         output_grid_index=input_index,  # for the model
-        #     ).requires_grad_(do_optimize)
-
-        #     self.interpolate_data_to_model_output = InterpolateGrid1D(
-        #         input_grid=interpolate["input_grid"],
-        #         output_grid=interpolate["output_grid"],
-        #         input_grid_index=interpolate["output_index"],  # for the model
-        #         output_grid_index=output_index,  # for the data
-        #     ).requires_grad_(do_optimize)
-
-        #     self.interpolate_model_to_data_output = InterpolateGrid1D(
-        #         input_grid=interpolate["output_grid"],
-        #         output_grid=interpolate["input_grid"],
-        #         input_grid_index=output_index,  # for the model
-        #         output_grid_index=interpolate["output_index"],  # for the data
-        #     ).requires_grad_(do_optimize)
+        else:
+            self.hparams.zero_output = False          
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -130,8 +106,9 @@ class TrainingModel(LightningModule):
 
     def setup_normalize(self, data_stats):
         if self.hparams.use_batch_norm_for_norm:
-            input_normalization = NormalizationBN1D(self.hparams.model_config.input_size)
-            output_normalization = NormalizationBN1D(self.hparams.model_config.output_size)
+            logger.info("using batch norm for norm ...")
+            input_normalization = NormalizationBN1D(self.hparams.model_config["input_size"])
+            output_normalization = NormalizationBN1D(self.hparams.model_config["output_size"])
             return input_normalization, output_normalization
 
         if isinstance(data_stats, str) and os.path.exists(data_stats):
@@ -151,11 +128,6 @@ class TrainingModel(LightningModule):
                 list(self.hparams.input_index.values())[-1][-1],
                 list(self.hparams.output_index.values())[-1][-1],
             ]
-
-            if self.hparams.interpolate is not None:
-                sizes[-1] = list(self.hparams.interpolate["output_index"].values())[-1][
-                    -1
-                ]
 
             for v in sizes:
                 layers.append(
@@ -195,11 +167,14 @@ class TrainingModel(LightningModule):
             stats["range"] = torch.maximum(
                 stats["max"] - stats["mean"], stats["mean"] - stats["min"]
             )
-            stats["std_eff"] = torch.where(
-                stats["std"] > thr, stats["std"], stats["range"]
-            )
+
+            std  =  stats["range"]
+
+            # stats["std_eff"] = torch.where(
+            #     stats["std"] > thr, stats["std"], stats["range"]
+            # )
             mn = stats["mean"]
-            std = stats["std_eff"]
+            # std = stats["std_eff"]
         else:
             mn = stats["mean"]
             std = stats["std"]
@@ -233,15 +208,14 @@ class TrainingModel(LightningModule):
 
     def forward(self, x, index=None):
         if index is not None:
-            return self.model(x, index=index)
+            y = self.model(x, index=index)
         else:
-            return self.model(x)
+            y = self.model(x)
 
-    def select_input_variables(self, x):
-        if self.hparams.ignore_input_variables is None:
-            return x
-        else:
-            return x[:, self.input_variable_index, ...]
+        if self.hparams.zero_outputs:
+            y = y.masked_fill_(self.loss_output_weights[None,:] == 0,0.)
+
+        return y
 
     def handle_batch(self, batch):
 
@@ -254,45 +228,12 @@ class TrainingModel(LightningModule):
 
         num_dims = len(x.shape)
 
-        if num_dims == 3 or num_dims == 5:
-            # have history/memory
-            x = x[:, -1, ...]  # only use last time stemps for state vars
-            y1 = y[:, 0, ...]
-            y2 = y[:, 1, ...]
+        x = self.input_normalize(x)
+        y = self.output_normalize(y)
 
-            # if self.hparams.interpolate is not None:
-            #     x = self.interpolate_data_to_model_input(x)
-            #     # y1 = self.interpolate_data_to_model_output(y1)
-            #     # y2 = self.interpolate_data_to_model_output(y2)
+        # x = self.select_input_variables(x)
 
-            x = self.input_normalize(x)
-            x = self.select_input_variables(x)
-
-            y2 = self.output_normalize(y2)
-
-            if self.hparams.model_config["model_type"] == "fcn_history":
-                y1 = self.output_normalize(y1)
-                if self.hparams.memory_variables is not None:
-                    # not using all variables for history
-                    y1 = y1[:, self.memory_variable_index, ...]
-                res = [x, y1], y2
-            else:
-                # dont use history
-
-                res = x, y2
-
-        else:
-
-            if self.hparams.interpolate is not None:
-                x = self.interpolate_data_to_model_input(x)
-                # y = self.interpolate_data_to_model_output(y)
-
-            x = self.input_normalize(x)
-            y = self.output_normalize(y)
-
-            x = self.select_input_variables(x)
-
-            res = x, y
+        res = x, y
 
         return res + (index,)
 
@@ -300,6 +241,9 @@ class TrainingModel(LightningModule):
         # x, y = batch
         # x = self.input_normalize(x)
         # y = self.output_normalize(y)
+
+        if self.fine_tuning:
+            self.model.eval()
 
         x, y, index = self.handle_batch(batch)
 
@@ -310,13 +254,33 @@ class TrainingModel(LightningModule):
         else:
             raise ValueError("wrong size of x")
 
+        if self.training and (self.hparams.noise_sigma > 0):
+            noise = torch.randn_like(x)*self.hparams.noise_sigma
+            noise = noise.masked_fill(torch.rand_like(x)>.5, 0.)
+            x = x + noise
+
         yhat = self(x, index=index)
 
-        if self.hparams.interpolate is not None:
-            yhat = self.interpolate_model_to_data_output(yhat)
-
         loss = OrderedDict()
-        mse = F.mse_loss(y, yhat, reduction="none")
+
+        losses_to_reduce  = []
+
+        if self.hparams.loss == "mse":
+            mse = F.mse_loss(y, yhat, reduction="none")
+
+        elif self.hparams.loss == "smooth_l1":
+            loss["smooth_l1"] = F.smooth_l1_loss(yhat, y, reduction="none")
+            with torch.no_grad():
+                mse = F.mse_loss(y, yhat, reduction="none")
+                
+            losses_to_reduce.append("smooth_l1")
+
+        else:
+            raise ValueError(f"unknown {self.hparams.loss}")
+
+        loss["mse"] = mse
+        losses_to_reduce.append("mse")
+
 
         with torch.no_grad():
             skill = (
@@ -328,19 +292,19 @@ class TrainingModel(LightningModule):
 
             loss["skill_ave_clipped"] = skill.mean()
 
-            if mode == "test":
-                for k, v in self.hparams.output_index.items():
-                    loss_name = f"skill_ave_trunc_{k}"
-                    y_v = y[:, v[0] : v[1], ...]
-                    mse_v = mse[:, v[0] : v[1], ...]
+            for k, v in self.hparams.output_index.items():
+                loss_name = f"skill_ave_trunc_{k}"
+                y_v = y[:, v[0] : v[1], ...]
+                mse_v = mse[:, v[0] : v[1], ...]
 
-                    skill = (
-                        1.0
-                        - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False)
-                    ).clip(0, 1)
+                skill = (
+                    1.0
+                    - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False)
+                ).clip(0, 1)
 
-                    loss[loss_name] = skill.mean()
+                loss[loss_name] = skill.mean()
 
+                if mode == "test":
                     for i in range(skill.shape[0]):
                         loss_name = f"skill_ave_trunc_{k}_{i:02}"
                         loss[loss_name] = skill[i]
@@ -348,21 +312,25 @@ class TrainingModel(LightningModule):
         if self.hparams.loss_output_weights is not None:
 
             num_dims = len(mse.shape)
-            if num_dims == 4:
-                mse = mse * self.loss_output_weights[None, :, None, None]
-            elif num_dims == 2:
-                mse = mse * self.loss_output_weights[None, :]
-            else:
-                raise ValueError("wrong number of dims in mse")
 
-        loss["mse"] = mse.mean()
+            for n in losses_to_reduce:
+                if num_dims == 4:
+                    loss[n] = loss[n] * self.loss_output_weights[None, :, None, None]
+                elif num_dims == 2:
+                    loss[n] = loss[n] * self.loss_output_weights[None, :]
+                else:
+                    raise ValueError("wrong number of dims in mse")
+
+        for n in losses_to_reduce:
+            loss[n] = loss[n].mean()
+
         for k, v in loss.items():
             self.log(f"{mode}_{k}", v, on_epoch=True)
         return loss
 
     def training_step(self, batch, batch_idx):
         loss = self.step(batch, "train")
-        return loss["mse"]
+        return loss[self.hparams.loss]
 
     def validation_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "val")
@@ -371,7 +339,7 @@ class TrainingModel(LightningModule):
         self.step(batch, "test")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
-        x, y = self.handle_batch(batch)
+        x, y, index = self.handle_batch(batch)
 
         if self.hparams.predict_hidden_states:
             y, h = self.model(x, return_hidden_state=True)
@@ -379,9 +347,6 @@ class TrainingModel(LightningModule):
         else:
             yhat = self(x)
             yhat = self.output_normalize(yhat, normalize=False)  # denormalize
-
-            if self.hparams.interpolate is not None:
-                yhat = self.interpolate_model_to_data_output(yhat)
 
             return yhat.cpu()
 

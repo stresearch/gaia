@@ -909,6 +909,12 @@ def get_dataset(
 
     if (inputs is not None) or (outputs is not None):
 
+        if inputs is None:
+            inputs = list(var_index["input_index"].keys())
+
+        if outputs is None:
+            outputs = list(var_index["output_index"].keys())
+
         assert len(dataset_dict["x"].shape) in [3, 5]
         logger.info(f"constructing custom inputs from datasets: inputs: {inputs} outputs: {outputs}")
 
@@ -989,7 +995,7 @@ def get_dataset(
 
     # do some grid interpolation
 
-    if (model_grid is not None) and (data_grid != model_grid):
+    if (data_grid is not None) and (model_grid is not None) and (data_grid != model_grid):
 
         logger.info(f"model grid is not equal to data grid.. need to interpolate from {len(data_grid)} grids to {len(model_grid)}")
         input_interpolation = InterpolateGrid1D(input_grid=data_grid, output_grid=model_grid, input_grid_index=dataset_dict["input_index"])

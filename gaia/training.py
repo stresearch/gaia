@@ -169,6 +169,12 @@ def main(
         model_dir = trainer.log_dir
 
     if "finetune" in mode:
+        # assuming we'll fine-tune on a different dataset
+        if model_params.get("pretrained", None) is not None:
+            logger.info(f"loading pretrained {model_params}")
+            pretrained = get_checkpoint_file(model_params["pretrained"])
+        else:
+            raise ValueError("need to specify pretrained to fine-tune")
 
 
 
@@ -283,14 +289,6 @@ def main(
 
         # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
-        model_grid = model.hparams.get("model_grid", None)
-        if model_grid is None:
-            logger.info("model grid is not found... trying to infer from dataset")
-            dataset = model.hparams.dataset_params.get("dataset",None)
-            if dataset:
-                model_grid = get_levels(dataset)
-
-
         test_dataset, test_dataloader = get_dataset(
             **dataset_params["test"], model_grid = model_grid
         )
@@ -304,14 +302,12 @@ def main(
             checkpoint_callback=False,
             logger=False,
             **trainer_params,
-            )
+        )
 
-
-            test_results = trainer.test(model, dataloaders=test_dataloader)
-            # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-            dataset = dataset_params.get("dataset","")
-            path_to_save = os.path.join(model_dir, f"test_results_{dataset}.json")
-            json.dump(test_results, open(path_to_save, "w"))
+        test_results = trainer.test(model, dataloaders=test_dataloader)
+        # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
+        path_to_save = os.path.join(model_dir, f"test_results.json")
+        json.dump(test_results, open(path_to_save, "w"))
 
         if "predict" in mode:
             

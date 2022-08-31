@@ -34,19 +34,6 @@ class Normalization(torch.nn.Module):
             else:
                 raise ValueError("data must be either 2 or 4 dimensional")
 
-class NormalizationBN1D(torch.nn.Module):
-    def __init__(self, num_features, eps= 1e-9):
-        super().__init__()
-        self.bn = torch.nn.BatchNorm1d(num_features, affine = False, eps= eps)
-        
-    def forward(self, x, normalize=True):
-        if normalize:
-            return self.bn(x)
-        else:  # demormalize
-            return x * self.bn.running_var[None,:].sqrt() + self.bn.running_mean[None,:]
-
-
-
 
 class InterpolateGrid1D(torch.nn.Module):
     log_linear_vars = ("Q",)

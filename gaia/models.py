@@ -42,12 +42,6 @@ class TrainingModel(LightningModule):
         loss_output_weights=None,
         predict_hidden_states=False,
         lr_schedule=None,
-        use_batch_norm_for_norm = False,
-        fine_tuning = False,
-        loss = "mse",
-        zero_outputs = True,
-        noise_sigma = 0,
-        unit_normalize = False,
         **kwargs,
     ):
         super().__init__()
@@ -60,9 +54,29 @@ class TrainingModel(LightningModule):
         self.save_hyperparameters(ignore=ignore)
         model_type = model_config["model_type"]
 
-        self.fine_tuning = fine_tuning
-
         self.input_normalize, self.output_normalize = self.setup_normalize(data_stats)
+
+        if memory_variables is not None:
+            logger.info(f"using a subset of output vars in memory: {memory_variables}")
+            memory_variable_index = []
+            for v in memory_variables:
+                memory_variable_index.append(torch.arange(*output_index[v]))
+            self.register_buffer(
+                "memory_variable_index", torch.cat(memory_variable_index)
+            )
+            model_config["memory_size"] = len(self.memory_variable_index)
+
+        if ignore_input_variables is not None:
+            logger.info(f"using a subset of inputs vars: {ignore_input_variables}")
+            input_variable_index = []
+            for k, v in input_index.items():
+                if k not in ignore_input_variables:
+                    start_idx, stop_idx = v
+                    input_variable_index.append(torch.arange(start_idx, stop_idx))
+            self.register_buffer(
+                "input_variable_index", torch.cat(input_variable_index)
+            )
+            model_config["input_size"] = len(self.input_variable_index)
 
         if model_type == "fcn":
             self.model = FcnBaseline(**model_config)
@@ -92,8 +106,37 @@ class TrainingModel(LightningModule):
             # w = torch.tensor(loss_output_weights)
             # w *= w.shape[0] / w.sum()
             self.make_output_weights(loss_output_weights)
-        else:
-            self.hparams.zero_output = False          
+
+        # if min_mean_thres is not None:
+        #     if loss_output_weights is not None:
+        #         raise ValueError("max_mean_threshold and loss_output_weights cant be both not None")
+        #     outputs_to_ignore = self.output_normalize.std
+
+        if interpolate is not None:
+            logger.info(f"setting up interpolation")
+
+            do_optimize = interpolate["optimize"]
+
+            self.interpolate_data_to_model_input = InterpolateGrid1D(
+                input_grid=interpolate["input_grid"],
+                output_grid=interpolate["output_grid"],
+                input_grid_index=interpolate["input_index"],  # for the data
+                output_grid_index=input_index,  # for the model
+            ).requires_grad_(do_optimize)
+
+            self.interpolate_data_to_model_output = InterpolateGrid1D(
+                input_grid=interpolate["input_grid"],
+                output_grid=interpolate["output_grid"],
+                input_grid_index=interpolate["output_index"],  # for the model
+                output_grid_index=output_index,  # for the data
+            ).requires_grad_(do_optimize)
+
+            self.interpolate_model_to_data_output = InterpolateGrid1D(
+                input_grid=interpolate["output_grid"],
+                output_grid=interpolate["input_grid"],
+                input_grid_index=output_index,  # for the model
+                output_grid_index=interpolate["output_index"],  # for the data
+            ).requires_grad_(do_optimize)
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -105,12 +148,6 @@ class TrainingModel(LightningModule):
         return w
 
     def setup_normalize(self, data_stats):
-        if self.hparams.use_batch_norm_for_norm:
-            logger.info("using batch norm for norm ...")
-            input_normalization = NormalizationBN1D(self.hparams.model_config["input_size"])
-            output_normalization = NormalizationBN1D(self.hparams.model_config["output_size"])
-            return input_normalization, output_normalization
-
         if isinstance(data_stats, str) and os.path.exists(data_stats):
             stats = torch.load(data_stats)
         elif isinstance(data_stats, dict):
@@ -228,8 +265,41 @@ class TrainingModel(LightningModule):
 
         num_dims = len(x.shape)
 
-        x = self.input_normalize(x)
-        y = self.output_normalize(y)
+        if num_dims == 3 or num_dims == 5:
+            # have history/memory
+            x = x[:, -1, ...]  # only use last time stemps for state vars
+            y1 = y[:, 0, ...]
+            y2 = y[:, 1, ...]
+
+            if self.hparams.interpolate is not None:
+                x = self.interpolate_data_to_model_input(x)
+                # y1 = self.interpolate_data_to_model_output(y1)
+                # y2 = self.interpolate_data_to_model_output(y2)
+
+            x = self.input_normalize(x)
+            x = self.select_input_variables(x)
+
+            y2 = self.output_normalize(y2)
+
+            if self.hparams.model_config["model_type"] == "fcn_history":
+                y1 = self.output_normalize(y1)
+                if self.hparams.memory_variables is not None:
+                    # not using all variables for history
+                    y1 = y1[:, self.memory_variable_index, ...]
+                res = [x, y1], y2
+            else:
+                # dont use history
+
+                res = x, y2
+
+        else:
+
+            if self.hparams.interpolate is not None:
+                x = self.interpolate_data_to_model_input(x)
+                # y = self.interpolate_data_to_model_output(y)
+
+            x = self.input_normalize(x)
+            y = self.output_normalize(y)
 
         # x = self.select_input_variables(x)
 

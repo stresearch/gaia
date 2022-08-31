@@ -47,6 +47,7 @@ class TrainingModel(LightningModule):
         loss = "mse",
         zero_outputs = True,
         noise_sigma = 0,
+        unit_normalize = False,
         **kwargs,
     ):
         super().__init__()
@@ -166,11 +167,14 @@ class TrainingModel(LightningModule):
             stats["range"] = torch.maximum(
                 stats["max"] - stats["mean"], stats["mean"] - stats["min"]
             )
-            stats["std_eff"] = torch.where(
-                stats["std"] > thr, stats["std"], stats["range"]
-            )
+
+            std  =  stats["range"]
+
+            # stats["std_eff"] = torch.where(
+            #     stats["std"] > thr, stats["std"], stats["range"]
+            # )
             mn = stats["mean"]
-            std = stats["std_eff"]
+            # std = stats["std_eff"]
         else:
             mn = stats["mean"]
             std = stats["std"]

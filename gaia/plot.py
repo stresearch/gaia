@@ -526,7 +526,7 @@ def plot_results(model_dir):
 def save_diagnostic_plot(
     model_dir,
     plot_types=["skill_vector", "skill_scalar", "skill_global", "correlation"],
-    dataset = "cam4_v3"
+    dataset = None
 ):
 
     import sys
@@ -743,6 +743,8 @@ def save_diagnostic_plot(
     if "correlation" in plot_types:
         logger.info("generating plots of skill for vector variables")
 
+        from holoviews.operation import datashader as ds
+
         def plot_correlation(var="PRECT", N=10000):
 
             if var not in scalar_output_variables:
@@ -769,24 +771,49 @@ def save_diagnostic_plot(
             except:
                 c = np.nan
 
+            limit_range = False
+
             mn = temp.values.mean()
             sd = temp.values.std()
 
-            ub = mn + sd * 5
+            temp["error_std"] =(temp.y - temp.yhat).abs()/sd
 
-            mask = (temp.abs() < ub).all(1)
+
+            temp = temp.sample(N, weights = "error_std")
+
+
+            # mask = ((temp-mn).abs() < 5 * sd).all(1)
+            # temp_inliers = temp.loc[mask]
+            # temp_inliers.loc[:,"kind"] = "inlier"
+
+                # mask_outliers = (temp.abs() >= ub).any(1)
+                # mask_outliers = ((temp-mn).abs() >= 5 * sd).any(1)
+
+               
+
+            rng = temp.loc[:,["y","yhat"]].abs().values.max()
+
+            # mask_outliers = temp.diff(1).abs() >= sd
 
             if symmetric:
-                rng = (-ub, ub)
+                rng = (-rng, rng)
             else:
-                rng = (-ub * 1e-1, ub)
+                rng = (-rng* 1e-1, rng)
 
-            temp = temp.loc[mask].sample(N)
+                # temp_outliers = temp.loc[mask_outliers]
+                # if len(temp_outliers) > 0:
+                #     temp_outliers.loc[:,"kind"] = "outlier"
+
+
+
+                # temp = pd.concat([temp_inliers.sample(N), temp_outliers], ignore_index=True)
+
+
 
             return (
                 (
-                    hv.Points((temp.y, temp.yhat), [f"y_{var}", f"yhat_{var}"]).opts(
-                        width=400, height=400, padding=0.05, alpha=0.2, line_color=None
+                    hv.Points((temp.y, temp.yhat, temp.error_std), kdims = [f"y_{var}", f"yhat_{var}"], vdims = [f"error_std_{var}"]).opts(
+                        width=400, height=400, padding=0.05, color = f"error_std_{var}", colorbar=True
                     )
                     * hv.Curve((rng, rng)).opts(
                         line_width=1, color="orange", title=f"corr: {c:.3f}"

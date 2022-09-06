@@ -255,8 +255,17 @@ class TrainingModel(LightningModule):
             raise ValueError("wrong size of x")
 
         if self.training and (self.hparams.noise_sigma > 0):
+            
             noise = torch.randn_like(x)*self.hparams.noise_sigma
-            noise = noise.masked_fill(torch.rand_like(x)>.5, 0.)
+
+            if len(x.shape) == 4:
+                x1 = x[:,:1,:1,:1]
+            elif len(x.shape) == 2:
+                x1 = x[:,:1]
+            else:
+                raise ValueError("wrong size of x")
+
+            noise = noise.masked_fill(torch.rand_like(x1)>.5, 0.)
             x = x + noise
 
         yhat = self(x, index=index)

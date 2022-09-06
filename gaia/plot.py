@@ -552,6 +552,11 @@ def save_diagnostic_plot(
 
     # model_dir = "../../gaia-surrogate/lightning_logs_intergration/version_0/"
     params = load_hparams_file(model_dir)
+
+    if dataset is None:
+        logger.info("dataset not, specified, using the one model was trained on")
+        dataset = params["dataset_params"]["dataset"]
+
     weights = (torch.tensor(params["loss_output_weights"]) > 0).float()
     yhat = torch.load(next(Path(model_dir).glob(f"predictions_{dataset}.pt")))
     yhat = yhat * weights[None, :, None, None]

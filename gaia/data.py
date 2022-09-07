@@ -373,7 +373,7 @@ def flatten_tensor(v):
     return v
 
 
-def unflatten_tensor(v):
+def unflatten_tensor(v, num_lons = 144, num_lats = 96 ):
     if len(v.shape) == 2:
         num_samples, num_channels = v.shape
         time_steps = 1
@@ -383,10 +383,10 @@ def unflatten_tensor(v):
         raise ValueError(f"shape {v.shape} not supported")
 
     if time_steps > 1:
-        v = v.reshape(-1, 96, 144, time_steps, num_channels).permute([0, 3, 4, 1, 2])
+        v = v.reshape(-1, num_lats, num_lons, time_steps, num_channels).permute([0, 3, 4, 1, 2])
     else:
 
-        v = v.reshape(-1, 96, 144, num_channels).permute([0, 3, 1, 2])
+        v = v.reshape(-1, num_lats, num_lons, num_channels).permute([0, 3, 1, 2])
 
     return v
 

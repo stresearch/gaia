@@ -19,6 +19,14 @@ class ModelForExport(torch.nn.Module):
         self.output_normalize = training_model.output_normalize
         self.model = training_model.model
 
+        if training_model.hparams.zero_outputs:
+            zero_output = training_model.loss_output_weights[None,:] == 0
+        else:
+            output_dim = list(training_model.hparams.output_index.values())[-1][-1]
+            zero_output = torch.ones(output_dim, 1).bool()
+
+        self.register_buffer("zero_output", zero_output)
+
         if input_order is not None:
             if input_order == list(training_model.hparams.input_index.keys()):
                 logger.info("inputs align... don't need to reorder")
@@ -117,6 +125,7 @@ class ModelForExport(torch.nn.Module):
 
         y = self.model(x_norm)
         y = self.output_normalize(y, normalize=False)
+        y = y.masked_fill_(self.zero_output,0.)
 
         if self.reorder_output:
             if self.need_pass_thru:

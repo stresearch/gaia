@@ -74,7 +74,15 @@ def update_model_params_from_dataset(
         logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
         if levels:
-            level_weights = torch.tensor([0] + levels).diff()
+            
+
+            if model_params.get("upweigh_low_levels",False):
+                logger.info("upweighing low levels")
+                level_weights = torch.linspace(.1,1.,len(levels))
+            else:
+                level_weights = torch.tensor([0] + levels).diff()
+
+
             temp = []
             for o, (s, e) in dataset_dict["output_index"].items():
                 if e - s > 1:
@@ -87,7 +95,6 @@ def update_model_params_from_dataset(
             loss_output_weights = level_weights * loss_output_weights
 
         model_params["loss_output_weights"] = loss_output_weights.tolist()
-
 
 def load_hparams_file(model_dir):
     yaml_file = os.path.join(model_dir, "hparams.yaml")

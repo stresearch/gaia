@@ -941,9 +941,9 @@ def save_diagnostic_plot(
                 )
             else:
                 return (
-                    hv.QuadMesh((lons, lats, mse), ["lons", "lats"], [f"{var}_mse"])
+                    hv.QuadMesh((lons, lats, np.sqrt(mse)), ["lons", "lats"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_mse": (0, mse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, np.sqrt(mse_max))})
                 )
 
         for var in tqdm.tqdm(vector_output_variables):  # = 'PTTEND'

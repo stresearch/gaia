@@ -508,7 +508,7 @@ class NCDataConstructor:
             inputs=inputs,
             outputs=outputs,
             flatten = split == "train",
-            shuffle = split == "train",
+            shuffle = True, #split == "train",
             subsample_factor=subsample_factor,
             compute_stats=True,
             cache = os.path.join(cache,split),

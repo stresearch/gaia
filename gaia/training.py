@@ -8,9 +8,7 @@ from gaia.callbacks import WriteGraph
 from gaia.evaluate import process_results
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
-    NcDatasetMem,
     make_dummy_dataset,
-    NcIterableDataset,
     FastTensorDataset,
     get_dataset,
     unflatten_tensor,

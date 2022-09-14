@@ -624,9 +624,9 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            mse = mse.numpy()
+            rmse = mse.sqrt().numpy()
 
-            mse_max = mse.mean() + 3 * mse.std()
+            rmse_max = rmse.mean() + 3 * rmse.std()
 
             # return skill
 
@@ -636,13 +636,13 @@ def save_diagnostic_plot(
                         (lats, levels, skill), ["lats", "levels"], [f"{var}_skill"]
                     )
                     .opts(symmetric=False, cmap="Greens")
-                    .redim.range(**{f"{var}_skill": (0, 1)})
+                    # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
-                    hv.QuadMesh((lats, levels, mse), ["lats", "levels"], [f"{var}_mse"])
+                    hv.QuadMesh((lats, levels, rmse), ["lats", "levels"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_mse": (0, mse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
                 )
 
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
@@ -659,7 +659,7 @@ def save_diagnostic_plot(
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
-        ).redim.values(variable=vector_output_variables, metric=["skill", "mse"])
+        ).redim.values(variable=vector_output_variables, metric=["skill", "rmse"])
         p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
 
         # p_metrics
@@ -700,7 +700,7 @@ def save_diagnostic_plot(
                 (lats, temp), ["lats"], [f"{var}_mean"]
             )
 
-        def plot_mse_scale(var, kind):
+        def plot_rmse_scale(var, kind):
 
             s, e = output_index[var]
 
@@ -710,18 +710,19 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            mse = mse.numpy().ravel()
+            rmse = mse.sqrt().numpy().ravel()
 
-            mse_max = mse.mean() + 3 * mse.std()
+            rmse_max = rmse.mean() + 3 * rmse.std()
 
             # find robust range
 
             if kind == "skill":
-                return hv.Curve((lats, skill), ["lats"], [f"{var}_skill"]).redim.range(
-                    **{f"{var}_skill": (0, 1)}
-                )
+                return hv.Curve((lats, skill), ["lats"], [f"{var}_skill"])
+                #.redim.range(
+                    # **{f"{var}_skill": (0, 1)}
+                # )
             else:
-                return hv.Curve((lats, mse), ["lats"], [f"{var}_mse"])
+                return hv.Curve((lats, rmse), ["lats"], [f"{var}_rmse"])
 
         p_mean = hv.DynamicMap(
             plot_mean_scale, kdims=["variable", "kind"]
@@ -736,8 +737,8 @@ def save_diagnostic_plot(
         )
 
         p_metric = hv.DynamicMap(
-            plot_mse_scale, kdims=["variable", "metric"]
-        ).redim.values(variable=scalar_output_variables, metric=["skill", "mse"])
+            plot_rmse_scale, kdims=["variable", "metric"]
+        ).redim.values(variable=scalar_output_variables, metric=["skill", "rmse"])
         p_metric = p_metric.layout(["variable", "metric"]).opts(curve_opts)
 
         # p_metric.overlay("variable").opts(legend_position = "right").opts(curve_opts)
@@ -927,9 +928,9 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            mse = mse.numpy()
+            rmse = mse.sqrt().numpy()
 
-            mse_max = mse.mean() + 3 * mse.std()
+            rmse_max = rmse.mean() + 3 * rmse.std()
 
             # return skill
 
@@ -937,13 +938,13 @@ def save_diagnostic_plot(
                 return (
                     hv.QuadMesh((lons, lats, skill), ["lons", "lats"], [f"{var}_skill"])
                     .opts(symmetric=False, cmap="Greens")
-                    .redim.range(**{f"{var}_skill": (0, 1)})
+                    # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
-                    hv.QuadMesh((lons, lats, mse), ["lons", "lats"], [f"{var}_mse"])
+                    hv.QuadMesh((lons, lats, rmse), ["lons", "lats"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_mse": (0, mse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
                 )
 
         for var in tqdm.tqdm(vector_output_variables):  # = 'PTTEND'
@@ -965,7 +966,7 @@ def save_diagnostic_plot(
 
             p_metrics = hv.DynamicMap(
                 plot_metrics, kdims=["variable", "metric"]
-            ).redim.values(variable=variables, metric=["skill", "mse"])
+            ).redim.values(variable=variables, metric=["skill", "rmse"])
             p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
 
             # p_metrics
@@ -1004,7 +1005,7 @@ def save_diagnostic_plot(
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
-        ).redim.values(variable=variables, metric=["skill", "mse"])
+        ).redim.values(variable=variables, metric=["skill", "rmse"])
         p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
 
         # p_metrics

@@ -167,6 +167,7 @@ class Config():
                 "cam4_v2": "/ssddg1/gaia/cam4_v2/cam4-famip-30m-timestep-second-upload",
                 "cam4_v3": "/ssddg1/gaia/cam4_v3/cam4-famip-30m-timestep-second-upload",
                 "cam4_v4": "/ssddg1/gaia/cam4_v4/cam4-famip-30m-timestep-second-upload",
+                "cam4_v5": "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload",
                 "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
                 "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",

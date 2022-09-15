@@ -292,31 +292,29 @@ class TrainingModel(LightningModule):
 
 
         with torch.no_grad():
+            eps = 1e-18
+            y_var = y.var(reduce_dims, unbiased=False).clip(min = eps)
             skill = (
-                1.0 - mse.mean(reduce_dims) / y.var(reduce_dims, unbiased=False)
+                1.0 - mse.mean(reduce_dims) / y_var
             ).clip(0, 1)
+
+            for k, v in self.hparams.output_index.items():
+
+                loss_name = f"skill_ave_trunc_{k}"
+
+                skill_v = skill[v[0] : v[1]]
+                loss[loss_name] = skill_v.mean()
+
+                if mode == "test":
+                    for i, skill_vi in enumerate(skill_vi):
+                        loss_name = f"skill_ave_trunc_{k}_{i:02}"
+                        loss[loss_name] = skill_vi
+
 
             if self.hparams.loss_output_weights is not None:
                 skill = skill * self.loss_output_weights
 
             loss["skill_ave_clipped"] = skill.mean()
-
-            for k, v in self.hparams.output_index.items():
-                loss_name = f"skill_ave_trunc_{k}"
-                y_v = y[:, v[0] : v[1], ...]
-                mse_v = mse[:, v[0] : v[1], ...]
-
-                skill = (
-                    1.0
-                    - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False)
-                ).clip(0, 1)
-
-                loss[loss_name] = skill.mean()
-
-                if mode == "test":
-                    for i in range(skill.shape[0]):
-                        loss_name = f"skill_ave_trunc_{k}_{i:02}"
-                        loss[loss_name] = skill[i]
 
         if self.hparams.loss_output_weights is not None:
 

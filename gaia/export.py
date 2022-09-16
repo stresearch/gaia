@@ -153,10 +153,13 @@ def export(model_dir, export_name, inputs=None, outputs=None):
     out_traced = traced_script_module(example)
 
     with torch.no_grad():
-
+        logger.info("difference between traced and original")
         logger.info((out_traced - out).norm())
+
+        logger.info("traced output shape")
         logger.info(out_traced[0].shape)
 
+        logger.info("traced output")
         logger.info(out_traced[0])
 
     if inputs is None:

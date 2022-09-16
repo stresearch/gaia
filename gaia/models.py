@@ -306,7 +306,7 @@ class TrainingModel(LightningModule):
                 loss[loss_name] = skill_v.mean()
 
                 if mode == "test":
-                    for i, skill_vi in enumerate(skill_vi):
+                    for i, skill_vi in enumerate(skill_v):
                         loss_name = f"skill_ave_trunc_{k}_{i:02}"
                         loss[loss_name] = skill_vi
 

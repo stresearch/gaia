@@ -599,7 +599,7 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lats, levels, temp), ["lats", "levels"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu")
+            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
 
         def plot_std(var, kind):
             s, e = output_index[var]
@@ -612,7 +612,7 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lats, levels, temp), ["lats", "levels"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues")
+            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
 
         def plot_metrics(var, metric):
 
@@ -635,32 +635,32 @@ def save_diagnostic_plot(
                     hv.QuadMesh(
                         (lats, levels, skill), ["lats", "levels"], [f"{var}_skill"]
                     )
-                    .opts(symmetric=False, cmap="Greens")
+                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f")
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
                     hv.QuadMesh((lats, levels, rmse), ["lats", "levels"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
                 )
 
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
             variable=vector_output_variables, kind=["simulation", "surrogate"]
         )
-        p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+        p_mean = p_mean.layout("kind")
 
         p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
             variable=vector_output_variables, kind=["simulation", "surrogate"]
         )
-        p_std = p_std.layout("kind").opts(quad_mesh_opts)
+        p_std = p_std.layout("kind")
 
         # (p_mean + p_std).cols(1)
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
         ).redim.values(variable=vector_output_variables, metric=["skill", "rmse"])
-        p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+        p_metrics = p_metrics.layout("metric")
 
         # p_metrics
 
@@ -680,7 +680,7 @@ def save_diagnostic_plot(
         logger.info("generating plots of skill for scalar variables")
 
         curve_opts = hv.opts.Curve(
-            width=400, height=300, tools=["hover"], yformatter="%.1e"
+            width=400, height=300, tools=["hover"]
         )
 
         def plot_mean_scale(var, kind):
@@ -754,7 +754,7 @@ def save_diagnostic_plot(
         def plot_correlation(var="PRECT", N=10000):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -833,7 +833,7 @@ def save_diagnostic_plot(
 
             try:
                 p = hv.DynamicMap(plot_correlation, kdims=["var"]).redim.values(
-                    var=[f"{v}_{i}" for i in range(26)]
+                    var=[f"{v}__{i}" for i in range(26)]
                 )
                 # p.opts(axiswise = False)
                 # plot_correlation("PTTEND_21")
@@ -853,7 +853,7 @@ def save_diagnostic_plot(
         )
 
     if "skill_global" in plot_types:
-        logger.info("generating plots for globa skill")
+        logger.info("generating plots for global skill")
 
         quad_mesh_opts = hv.opts.QuadMesh(
             width=600,
@@ -867,7 +867,7 @@ def save_diagnostic_plot(
         def plot_mean(var, kind):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -885,12 +885,12 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lons, lats, temp), ["lons", "lats"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu")
+            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
 
         def plot_std(var, kind):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -908,12 +908,12 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lons, lats, temp), ["lons", "lats"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues")
+            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
 
         def plot_metrics(var, metric):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -937,37 +937,37 @@ def save_diagnostic_plot(
             if metric == "skill":
                 return (
                     hv.QuadMesh((lons, lats, skill), ["lons", "lats"], [f"{var}_skill"])
-                    .opts(symmetric=False, cmap="Greens")
+                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f",)
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
                     hv.QuadMesh((lons, lats, rmse), ["lons", "lats"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
                 )
 
         for var in tqdm.tqdm(vector_output_variables):  # = 'PTTEND'
             # for level_index in tqdm.trange(len(levels)):
 
-            variables = [f"{var}_{i:02}" for i in range(len(levels))]
+            variables = [f"{var}__{i:02}" for i in range(len(levels))]
 
             p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
                 variable=variables, kind=["simulation", "surrogate"]
             )
-            p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+            p_mean = p_mean.layout("kind")
 
             p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
                 variable=variables, kind=["simulation", "surrogate"]
             )
-            p_std = p_std.layout("kind").opts(quad_mesh_opts)
+            p_std = p_std.layout("kind")
 
             # (p_mean + p_std).cols(1)
 
             p_metrics = hv.DynamicMap(
                 plot_metrics, kdims=["variable", "metric"]
             ).redim.values(variable=variables, metric=["skill", "rmse"])
-            p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+            p_metrics = p_metrics.layout("metric")
 
             # p_metrics
 
@@ -994,19 +994,19 @@ def save_diagnostic_plot(
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
             variable=variables, kind=["simulation", "surrogate"]
         )
-        p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+        p_mean = p_mean.layout("kind")
 
         p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
             variable=variables, kind=["simulation", "surrogate"]
         )
-        p_std = p_std.layout("kind").opts(quad_mesh_opts)
+        p_std = p_std.layout("kind")
 
         # (p_mean + p_std).cols(1)
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
         ).redim.values(variable=variables, metric=["skill", "rmse"])
-        p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+        p_metrics = p_metrics.layout("metric")
 
         # p_metrics
 

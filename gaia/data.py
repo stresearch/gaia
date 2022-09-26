@@ -609,7 +609,7 @@ def get_dataset(
 
 
         def extract_time_index(names):
-            if len(names[0].split(" "))==0:
+            if len(names[0].split(" "))==1:
                 # no time index in names
                 return names,None
             names,times = zip(*[n.split(" ") for n in names])

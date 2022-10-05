@@ -593,6 +593,7 @@ def get_dataset(
     outputs=None,
     data_grid = None,
     model_grid = None,
+    subsample_mode = "random"
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -812,8 +813,13 @@ def get_dataset(
         tensor_list = [t[mask, ...] for t in tensor_list]
 
     if subsample > 1:
-        tensor_list = [t[::subsample, ...] for t in tensor_list]
-        logger.info(f"subsampling by factor of {subsample}")
+        if subsample_mode == "default":
+            tensor_list = [t[::subsample, ...] for t in tensor_list]
+            logger.info(f"subsampling by factor of {subsample}")
+        elif subsample_mode == "weighted_lat_lon":
+            subsample_weights = None
+            # tensor_list = [ subsample(t, subsample, index, subsample subsample_weights, exploration = 0) for t in tensor_list]
+            
 
     logger.info(f"data size {len(tensor_list[0])}")
 

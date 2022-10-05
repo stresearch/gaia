@@ -1,6 +1,8 @@
 from asyncio.log import logger
 from collections import OrderedDict
+import warnings
 from pathlib import Path
+import sys
 import torch
 from gaia.models import TrainingModel
 from gaia.training import get_checkpoint_file
@@ -13,11 +15,12 @@ logger = get_logger(__name__)
 
 
 class ModelForExport(torch.nn.Module):
-    def __init__(self, training_model, input_order, output_order):
+    def __init__(self, training_model, input_order, output_order, debug = False):
         super().__init__()
         self.input_normalize = training_model.input_normalize
         self.output_normalize = training_model.output_normalize
         self.model = training_model.model
+        self.debug = debug
 
         if training_model.hparams.zero_outputs:
             zero_output = training_model.loss_output_weights[None,:] == 0
@@ -117,6 +120,13 @@ class ModelForExport(torch.nn.Module):
             self.reorder_output = False
 
     def forward(self, x):
+        if self.debug:
+            print("input shape: ", x.shape)
+            print("input type: ", x.dtype)
+            print("input first row: ", x[0,:])
+            print("input last row: ", x[-1,:])
+            print("input number of nans: ", x.isnan().sum())
+
 
         if self.reorder_input:
             x = x[:, self.input_order, ...]
@@ -132,24 +142,91 @@ class ModelForExport(torch.nn.Module):
                 y = torch.cat([x, y], dim=1)
             y = y[:, self.output_order, ...]
 
+        if self.debug:
+            print("output shape: ", y.shape)
+            print("output type: ", y.dtype)
+            print("output first row: ", y[0,:])
+            print("output last row: ", y[-1,:])
+            print("output number of nans: ", y.isnan().sum())
+
+
+
+        return y
+
+class ModelForExportSimple(torch.nn.Module):
+    def __init__(self, training_model, debug = False):
+        super().__init__()
+        self.input_normalize = training_model.input_normalize
+        self.output_normalize = training_model.output_normalize
+        self.model = training_model.model
+        self.debug = debug
+
+        if training_model.hparams.zero_outputs:
+            zero_output = training_model.loss_output_weights[None,:] == 0
+        else:
+            output_dim = list(training_model.hparams.output_index.values())[-1][-1]
+            zero_output = torch.ones(output_dim, 1).bool()
+
+        self.register_buffer("zero_output", zero_output)
+
+        
+
+    def forward(self, x):
+        if self.debug:
+            print("input shape: ", x.shape)
+            print("input type: ", x.dtype)
+            print("input number of nans: ", x.isnan().sum())
+            print("input first row :\n ", x[0,:])
+            print("input last row :\n ", x[-1,:])
+
+
+        x_norm = self.input_normalize(x)
+
+        y = self.model(x_norm)
+        y = self.output_normalize(y, normalize=False)
+        y = y.masked_fill_(self.zero_output,0.)
+
+        if self.debug:
+            print("output shape: ", y.shape)
+            print("output type: ", y.dtype)
+            print("output number of nans: ", y.isnan().sum())
+            print("output first row :\n ", y[0,:])
+            print("output last row :\n ", y[-1,:])
+
         return y
 
 
-def export(model_dir, export_name, inputs=None, outputs=None):
+
+def export(model_dir, export_name, inputs=None, outputs=None, debug = False, mode = "trace"):
 
     model = TrainingModel.load_from_checkpoint(
         get_checkpoint_file(model_dir),
         map_location="cpu",
     ).eval()
 
-    model_for_export = ModelForExport(model, inputs, outputs).eval().requires_grad_(False)
+    if inputs is None and outputs is None:
+        logger.info("assuming model has correct inputs and outputs, using simple export")
+        model_for_export = ModelForExportSimple(model, debug=debug).eval().requires_grad_(False)
+    else:
+        model_for_export = ModelForExport(model, inputs, outputs, debug=debug).eval().requires_grad_(False)
+
     # TODO dont hard code this
     input_dim = list(model.hparams.input_index.values())[-1][-1]
     example = torch.rand(10, input_dim)
+    logger.info("running dummy example thru original model")
+
     out = model_for_export(example)
-    traced_script_module = torch.jit.trace(model_for_export, example)
+
+    if mode == "trace":
+        traced_script_module = torch.jit.trace(model_for_export, example)
+    elif mode == "script":
+        traced_script_module = torch.jit.script(model_for_export)
+    else:
+        raise ValueError(f"unknown mode {mode}")
+
     traced_script_module.save(os.path.join(model_dir, export_name))
 
+    logger.info("running dummy example thru torchscript model")
     out_traced = traced_script_module(example)
 
     with torch.no_grad():
@@ -171,11 +248,11 @@ def export(model_dir, export_name, inputs=None, outputs=None):
         yaml.dump(dict(inputs=inputs, outputs=outputs), indent=2)
     )
 
-    test_file = (Path(model_dir) / "test_results.json")
-    if test_file.exists():
-        import pandas as pd
-        temp = pd.read_json(test_file).T
-        temp.index = temp.index.str.replace("test_skill_ave_trunc_","")
-        temp.columns = ["metric"]
-        temp.round(3).to_csv(os.path.join(model_dir, export_name.replace(".pt", "_test_skill.csv")))
+    # test_file = (Path(model_dir) / "test_results.json")
+    # if test_file.exists():
+    #     import pandas as pd
+    #     temp = pd.read_json(test_file).T
+    #     temp.index = temp.index.str.replace("test_skill_ave_trunc_","")
+    #     temp.columns = ["metric"]
+    #     temp.round(3).to_csv(os.path.join(model_dir, export_name.replace(".pt", "_test_skill.csv")))
 

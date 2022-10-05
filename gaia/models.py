@@ -1,9 +1,6 @@
 from collections import OrderedDict
 from math import ceil
-from multiprocessing import reduction
-from turtle import forward
-from typing import List, ValuesView
-from cv2 import normalize
+from typing import Optional
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
@@ -19,7 +16,6 @@ from gaia.layers import (
     make_interpolation_weights,
 )
 import os
-import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
@@ -410,14 +406,19 @@ class FcnBaseline(torch.nn.Module):
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
-    def forward(self, x, index = None):
-        if index is None:
+    def forward(self, x, index : Optional[torch.Tensor] = None):
+        if torch.jit.is_scripting():
             return self.model(x)
         else:
-            lats = self.lats[index[:,0]]
-            lons = self.lons[index[:,1]]
-            x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
-            return self.model(x)
+            if index is None:
+                return self.model(x)
+            else:
+                lats = self.lats[index[:,0]]
+                lons = self.lons[index[:,1]]
+                x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
+                return self.model(x)
+
+
 
 
 class FcnWithIndex(torch.nn.Module):

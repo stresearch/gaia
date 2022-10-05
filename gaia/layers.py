@@ -1,5 +1,6 @@
 from turtle import forward
 from typing import OrderedDict
+import typing
 import torch
 from gaia import get_logger
 
@@ -18,7 +19,7 @@ class Normalization(torch.nn.Module):
         self.register_buffer("mean", mean[None, :, None, None])
         self.register_buffer("std", std[None, :, None, None])
 
-    def forward(self, x, normalize=True):
+    def forward(self, x, normalize : bool =True):
         if normalize:
             if len(x.shape) == 4:
                 return (x - self.mean) / self.std

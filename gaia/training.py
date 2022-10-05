@@ -3,7 +3,6 @@ import json
 import os
 from cv2 import log
 
-from sympy import interpolate
 from gaia.callbacks import WriteGraph
 from gaia.evaluate import process_results
 from gaia.models import ComputeStats, TrainingModel
@@ -362,3 +361,25 @@ def main(
 
 
     return model_dir
+
+
+
+def get_dataset_from_model(model):
+
+    model_grid = model.hparams.get("model_grid", None)
+    if model_grid is None:
+        logger.info("model grid is not found... trying to infer from dataset")
+        dataset = model.hparams.dataset_params.get("dataset",None)
+        if dataset:
+            model_grid = get_levels(dataset)
+
+
+    dataset_params = model.hparams.dataset_params
+
+
+    test_dataset, test_dataloader = get_dataset(
+            **dataset_params["test"], model_grid = model_grid
+        )
+
+    return test_dataset, test_dataloader
+

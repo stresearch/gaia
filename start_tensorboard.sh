@@ -1,0 +1,1 @@
+tensorboard --logdir lightning_logs_integration_fixed --bind_all --port 8999

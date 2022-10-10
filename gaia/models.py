@@ -44,6 +44,7 @@ class TrainingModel(LightningModule):
         zero_outputs = True,
         noise_sigma = 0,
         unit_normalize = False,
+        weight_decay = 0,
         **kwargs,
     ):
         super().__init__()
@@ -183,10 +184,10 @@ class TrainingModel(LightningModule):
     def configure_optimizers(self):
         out = {}
         if self.hparams.optimizer == "adam":
-            optim = torch.optim.Adam
+            optim = torch.optim.AdamW
         elif self.hparams.optimizer == "lamb":
             optim = torch_optimizer.Lamb
-        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr)
+        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         if self.hparams.lr_schedule is not None:
             if self.hparams.lr_schedule == "cosine":
                 out["lr_scheduler"] = {

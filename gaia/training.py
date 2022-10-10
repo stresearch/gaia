@@ -3,7 +3,6 @@ import json
 import os
 from cv2 import log
 
-from sympy import interpolate
 from gaia.callbacks import WriteGraph
 from gaia.evaluate import process_results
 from gaia.models import ComputeStats, TrainingModel
@@ -295,9 +294,13 @@ def main(
             if dataset:
                 model_grid = get_levels(dataset)
 
+        split = "test"
+
+        if split != "test":
+            logger.warning("split for testing is not set to test? is that right")
 
         test_dataset, test_dataloader = get_dataset(
-            **dataset_params["test"], model_grid = model_grid
+            **dataset_params[split], model_grid = model_grid
         )
 
         
@@ -315,7 +318,7 @@ def main(
             test_results = trainer.test(model, dataloaders=test_dataloader)
             # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
             dataset = dataset_params.get("dataset","")
-            path_to_save = os.path.join(model_dir, f"test_results_{dataset}.json")
+            path_to_save = os.path.join(model_dir, f"{split}_results_{dataset}.json")
             json.dump(test_results, open(path_to_save, "w"))
 
         if "predict" in mode:
@@ -362,3 +365,25 @@ def main(
 
 
     return model_dir
+
+
+
+def get_dataset_from_model(model, split = "test"):
+
+    model_grid = model.hparams.get("model_grid", None)
+    if model_grid is None:
+        logger.info("model grid is not found... trying to infer from dataset")
+        dataset = model.hparams.dataset_params.get("dataset",None)
+        if dataset:
+            model_grid = get_levels(dataset)
+
+
+    dataset_params = model.hparams.dataset_params
+
+
+    test_dataset, test_dataloader = get_dataset(
+            **dataset_params[split], model_grid = model_grid
+        )
+
+    return test_dataset, test_dataloader
+

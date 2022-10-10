@@ -593,6 +593,7 @@ def get_dataset(
     outputs=None,
     data_grid = None,
     model_grid = None,
+    subsample_mode = "random"
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -609,7 +610,7 @@ def get_dataset(
 
 
         def extract_time_index(names):
-            if len(names[0].split(" "))==0:
+            if len(names[0].split(" "))==1:
                 # no time index in names
                 return names,None
             names,times = zip(*[n.split(" ") for n in names])
@@ -741,8 +742,9 @@ def get_dataset(
 
     tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 
-    if include_index or (space_filter is not None):
+    if include_index or (space_filter is not None) or subsample_mode != "random":
         # TODO dont hard code this
+        logger.warning("THIS IS HARDCODED num_ts, num_lats, num_lons = 8, 96, 144")
         num_ts, num_lats, num_lons = 8, 96, 144
         logger.warning(
             f"using hardcoded expected shape for unraveling the index: {num_ts,num_lats,num_lons}"
@@ -812,8 +814,25 @@ def get_dataset(
         tensor_list = [t[mask, ...] for t in tensor_list]
 
     if subsample > 1:
-        tensor_list = [t[::subsample, ...] for t in tensor_list]
-        logger.info(f"subsampling by factor of {subsample}")
+        if subsample_mode == "random":
+            tensor_list = [t[::subsample, ...] for t in tensor_list]
+            logger.info(f"subsampling by factor of {subsample}")
+        else:
+            logger.info(f"using weighted subsample mode from file :{subsample_mode}")
+            lat_lon_weights = torch.load(subsample_mode)
+            # sample_weights = lat_lon_weights[index[:,0], index[:,1]]
+            number_of_samples = tensor_list[0].shape[0]//subsample
+            lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
+
+            lat_lon_sample_index = torch.multinomial(lat_lon_weights.ravel(), number_of_samples, replacement=True)
+
+
+
+            sample_index = torch.multinomial(sample_weights, number_of_samples, replacement=False)
+            tensor_list = [t[sample_index, ...] for t in tensor_list]
+
+            
+            
 
     logger.info(f"data size {len(tensor_list[0])}")
 

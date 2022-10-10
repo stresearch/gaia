@@ -7,14 +7,20 @@ This repository contains code for training and running climate neural network su
 
 >This work is part of the DARPA ACTME (AI-assisted Climate Tipping-point Modeling) AIE Program - https://github.com/ACTM-darpa/info-and-links
 
-[![](docs/sections/overview/overview_screenshot.png)](https://stresearch.github.io/gaia/)
+[![](https://stresearch.github.io/gaia/sections/overview/overview_screenshot.png)](https://stresearch.github.io/gaia/)
 
 - [Installation](#installation)
 - [Data Preprocessing](#data-preprocessing)
+  - [Example Dataset](#example-dataset)
+  - [Process Exported Dataset](#process-exported-dataset)
 - [Training](#training)
-  - [Parameters](#parameters)
+- [Parameters](#parameters)
+    - [Dataset Params](#dataset-params)
+    - [Training Params](#training-params)
+    - [Model Params](#model-params)
 - [Inference](#inference)
 - [Export Model for Integration](#export-model-for-integration)
+- [Pre-trained Models](#pre-trained-models)
 
 ## Installation
 
@@ -27,7 +33,11 @@ pip install -r requirements
 
 ## Data Preprocessing
 
-We work with outputs from two climate models: CAM4 and SPCAM. 
+### Example Dataset
+Small subsampled preprocess dataset is available here. 
+
+### Process Exported Dataset
+To prerocess large scale exports from climate model runs.  we work with outputs from two climate models: CAM4 and SPCAM. 
 - We assume raw data resides in an S3 bucket with one file per day in the `NCDF4` format. 
 - To prepocess the data we use a fairy large AWS EC instance:
   -  `r4.16xlarge` with 64 CPUs
@@ -79,7 +89,7 @@ dataset_params.dataset='cam4' \
 
 ```
 
-### Parameters
+## Parameters
 
 For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
 
@@ -238,4 +248,11 @@ inputs = None
 outputs = "PTEQ,PTTEND,DCQ,DTCOND,QRS,QRL,CLOUD,CONCLD,FSNS,FLNS,FSNT,FLNT,FSDS,FLDS,SRFRAD,SOLL,SOLS,SOLLD,SOLSD,PSL,PRECT,PRECC,PRECL,PRECSC,PRECSL".split(",")
 
 export(model_dir, export_name, inputs=inputs, outputs=outputs)
+
 ```
+
+## Pre-trained Models
+
+- FCN on CAM4 data
+- FCN on SPCAM data
+

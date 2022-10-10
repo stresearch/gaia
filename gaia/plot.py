@@ -599,7 +599,7 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lats, levels, temp), ["lats", "levels"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu")
+            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
 
         def plot_std(var, kind):
             s, e = output_index[var]
@@ -612,7 +612,7 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lats, levels, temp), ["lats", "levels"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues")
+            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
 
         def plot_metrics(var, metric):
 
@@ -635,32 +635,32 @@ def save_diagnostic_plot(
                     hv.QuadMesh(
                         (lats, levels, skill), ["lats", "levels"], [f"{var}_skill"]
                     )
-                    .opts(symmetric=False, cmap="Greens")
+                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f")
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
                     hv.QuadMesh((lats, levels, rmse), ["lats", "levels"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
                 )
 
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
             variable=vector_output_variables, kind=["simulation", "surrogate"]
         )
-        p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+        p_mean = p_mean.layout("kind")
 
         p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
             variable=vector_output_variables, kind=["simulation", "surrogate"]
         )
-        p_std = p_std.layout("kind").opts(quad_mesh_opts)
+        p_std = p_std.layout("kind")
 
         # (p_mean + p_std).cols(1)
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
         ).redim.values(variable=vector_output_variables, metric=["skill", "rmse"])
-        p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+        p_metrics = p_metrics.layout("metric")
 
         # p_metrics
 
@@ -680,7 +680,7 @@ def save_diagnostic_plot(
         logger.info("generating plots of skill for scalar variables")
 
         curve_opts = hv.opts.Curve(
-            width=400, height=300, tools=["hover"], yformatter="%.1e"
+            width=400, height=300, tools=["hover"]
         )
 
         def plot_mean_scale(var, kind):
@@ -754,7 +754,7 @@ def save_diagnostic_plot(
         def plot_correlation(var="PRECT", N=10000):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -833,7 +833,7 @@ def save_diagnostic_plot(
 
             try:
                 p = hv.DynamicMap(plot_correlation, kdims=["var"]).redim.values(
-                    var=[f"{v}_{i}" for i in range(26)]
+                    var=[f"{v}__{i}" for i in range(26)]
                 )
                 # p.opts(axiswise = False)
                 # plot_correlation("PTTEND_21")
@@ -853,7 +853,7 @@ def save_diagnostic_plot(
         )
 
     if "skill_global" in plot_types:
-        logger.info("generating plots for globa skill")
+        logger.info("generating plots for global skill")
 
         quad_mesh_opts = hv.opts.QuadMesh(
             width=600,
@@ -867,7 +867,7 @@ def save_diagnostic_plot(
         def plot_mean(var, kind):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -885,12 +885,12 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lons, lats, temp), ["lons", "lats"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu")
+            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
 
         def plot_std(var, kind):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -908,12 +908,12 @@ def save_diagnostic_plot(
 
             return hv.QuadMesh(
                 (lons, lats, temp), ["lons", "lats"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues")
+            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
 
         def plot_metrics(var, metric):
 
             if var not in scalar_output_variables:
-                var2, level = var.split("_")
+                var2, level = var.split("__")
                 level = int(level)
             else:
                 level = 0
@@ -937,37 +937,37 @@ def save_diagnostic_plot(
             if metric == "skill":
                 return (
                     hv.QuadMesh((lons, lats, skill), ["lons", "lats"], [f"{var}_skill"])
-                    .opts(symmetric=False, cmap="Greens")
+                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f",)
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
                     hv.QuadMesh((lons, lats, rmse), ["lons", "lats"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
                 )
 
         for var in tqdm.tqdm(vector_output_variables):  # = 'PTTEND'
             # for level_index in tqdm.trange(len(levels)):
 
-            variables = [f"{var}_{i:02}" for i in range(len(levels))]
+            variables = [f"{var}__{i:02}" for i in range(len(levels))]
 
             p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
                 variable=variables, kind=["simulation", "surrogate"]
             )
-            p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+            p_mean = p_mean.layout("kind")
 
             p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
                 variable=variables, kind=["simulation", "surrogate"]
             )
-            p_std = p_std.layout("kind").opts(quad_mesh_opts)
+            p_std = p_std.layout("kind")
 
             # (p_mean + p_std).cols(1)
 
             p_metrics = hv.DynamicMap(
                 plot_metrics, kdims=["variable", "metric"]
             ).redim.values(variable=variables, metric=["skill", "rmse"])
-            p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+            p_metrics = p_metrics.layout("metric")
 
             # p_metrics
 
@@ -994,19 +994,19 @@ def save_diagnostic_plot(
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
             variable=variables, kind=["simulation", "surrogate"]
         )
-        p_mean = p_mean.layout("kind").opts(quad_mesh_opts)
+        p_mean = p_mean.layout("kind")
 
         p_std = hv.DynamicMap(plot_std, kdims=["variable", "kind"]).redim.values(
             variable=variables, kind=["simulation", "surrogate"]
         )
-        p_std = p_std.layout("kind").opts(quad_mesh_opts)
+        p_std = p_std.layout("kind")
 
         # (p_mean + p_std).cols(1)
 
         p_metrics = hv.DynamicMap(
             plot_metrics, kdims=["variable", "metric"]
         ).redim.values(variable=variables, metric=["skill", "rmse"])
-        p_metrics = p_metrics.layout("metric").opts(quad_mesh_opts)
+        p_metrics = p_metrics.layout("metric")
 
         # p_metrics
 
@@ -1028,3 +1028,85 @@ def save_diagnostic_plot(
         # max_opts=100,
         # embed=True,
         # )
+
+
+def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
+    import sys
+    # sys.path.append("../../gaia-surrogate")
+    # from gaia.training import main
+    from gaia.config import Config, levels
+    from gaia.plot import lats,lons
+    from gaia.export import export
+    from math import log
+    import numpy as np
+    import torch
+
+    from gaia import data
+    from gaia.models import TrainingModel
+    from gaia.training import get_dataset_from_model, get_checkpoint_file
+    import holoviews as hv
+    hv.extension("bokeh")   
+
+
+    # model_dir = "/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs_integraion_fixed/version_2_100_no_TS"
+    model  = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), map_location="cpu").eval().requires_grad_(False).to(device)
+
+    def func(x):
+        xnorm = model.input_normalize(x)
+        ynorm = model.model(xnorm)
+        return model.output_normalize(ynorm,normalize = False).sum(0)
+
+    def func_norm(x):
+        return model.model(x).sum(0)
+
+
+    test_dataset, test_dataloader = get_dataset_from_model(model, split = "test")
+
+    N = 10000
+
+    if kind == "unnormalized":
+        random_index =torch.randperm(len(test_dataset["x"]))[:N]
+        xsample = model.input_normalize(torch.randn_like(test_dataset["x"][:N]).to(device),normalize = False).clone().requires_grad_(True)
+        xsample = test_dataset["x"][:N].clone().to(device).requires_grad_(True)
+        J = torch.autograd.functional.jacobian(func, xsample, vectorize=True).mean(1).cpu().numpy()
+
+    elif kind == "normalized":
+        N = 10000
+        random_index =torch.randperm(len(test_dataset["x"]))[:N]
+        xsample = model.input_normalize(test_dataset["x"][random_index].to(device)).clone().requires_grad_(True)
+
+        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=True).mean(1).cpu().numpy()
+
+    else:
+        ValueError()
+
+
+    input_vars = []
+    for k,(s,e) in model.hparams.input_index.items():
+        k = k.split("_")
+        if len(k) > 1:
+            k = k[-1]
+        else:
+            k = k[0]
+        if e-s>1:
+            for i in range(e-s):
+                input_vars.append(f"{k}{i:02}")
+        else:
+            input_vars.append(k)
+            
+    output_vars = []
+    for k,(s,e) in model.hparams.output_index.items():
+        k = k.split("_")
+        if len(k) > 1:
+            k = k[-1]
+        else:
+            k = k[0]
+        if e-s>1:
+            for i in range(e-s):
+                output_vars.append(f"{k}{i:02}")
+        else:
+            output_vars.append(k)
+
+
+    normalized_gradient  = hv.HeatMap((input_vars, output_vars, np.tanh(J)),["input","output"],["gradient"]).opts(colorbar= True, symmetric=True, cmap = "coolwarm", width = 1900, height = 1000, xrotation = 90, tools = ["hover"])
+    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh_train.html"))

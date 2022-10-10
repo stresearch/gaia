@@ -1,9 +1,6 @@
 from collections import OrderedDict
 from math import ceil
-from multiprocessing import reduction
-from turtle import forward
-from typing import List, ValuesView
-from cv2 import normalize
+from typing import Optional
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import functional as F
@@ -19,7 +16,6 @@ from gaia.layers import (
     make_interpolation_weights,
 )
 import os
-import torch_optimizer
 from gaia.unet.unet import UNet
 import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
@@ -48,6 +44,7 @@ class TrainingModel(LightningModule):
         zero_outputs = True,
         noise_sigma = 0,
         unit_normalize = False,
+        weight_decay = 0,
         **kwargs,
     ):
         super().__init__()
@@ -187,10 +184,11 @@ class TrainingModel(LightningModule):
     def configure_optimizers(self):
         out = {}
         if self.hparams.optimizer == "adam":
-            optim = torch.optim.Adam
+            optim = torch.optim.AdamW
         elif self.hparams.optimizer == "lamb":
+            import torch_optimizer
             optim = torch_optimizer.Lamb
-        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr)
+        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         if self.hparams.lr_schedule is not None:
             if self.hparams.lr_schedule == "cosine":
                 out["lr_scheduler"] = {
@@ -292,31 +290,29 @@ class TrainingModel(LightningModule):
 
 
         with torch.no_grad():
+            eps = 1e-18
+            y_var = y.var(reduce_dims, unbiased=False).clip(min = eps)
             skill = (
-                1.0 - mse.mean(reduce_dims) / y.var(reduce_dims, unbiased=False)
+                1.0 - mse.mean(reduce_dims) / y_var
             ).clip(0, 1)
+
+            for k, v in self.hparams.output_index.items():
+
+                loss_name = f"skill_ave_trunc_{k}"
+
+                skill_v = skill[v[0] : v[1]]
+                loss[loss_name] = skill_v.mean()
+
+                if mode == "test":
+                    for i, skill_vi in enumerate(skill_v):
+                        loss_name = f"skill_ave_trunc_{k}_{i:02}"
+                        loss[loss_name] = skill_vi
+
 
             if self.hparams.loss_output_weights is not None:
                 skill = skill * self.loss_output_weights
 
             loss["skill_ave_clipped"] = skill.mean()
-
-            for k, v in self.hparams.output_index.items():
-                loss_name = f"skill_ave_trunc_{k}"
-                y_v = y[:, v[0] : v[1], ...]
-                mse_v = mse[:, v[0] : v[1], ...]
-
-                skill = (
-                    1.0
-                    - mse_v.mean(reduce_dims) / y_v.var(reduce_dims, unbiased=False)
-                ).clip(0, 1)
-
-                loss[loss_name] = skill.mean()
-
-                if mode == "test":
-                    for i in range(skill.shape[0]):
-                        loss_name = f"skill_ave_trunc_{k}_{i:02}"
-                        loss[loss_name] = skill[i]
 
         if self.hparams.loss_output_weights is not None:
 
@@ -412,14 +408,19 @@ class FcnBaseline(torch.nn.Module):
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
-    def forward(self, x, index = None):
-        if index is None:
+    def forward(self, x, index : Optional[torch.Tensor] = None):
+        if torch.jit.is_scripting():
             return self.model(x)
         else:
-            lats = self.lats[index[:,0]]
-            lons = self.lons[index[:,1]]
-            x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
-            return self.model(x)
+            if index is None:
+                return self.model(x)
+            else:
+                lats = self.lats[index[:,0]]
+                lons = self.lons[index[:,1]]
+                x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
+                return self.model(x)
+
+
 
 
 class FcnWithIndex(torch.nn.Module):

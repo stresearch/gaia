@@ -167,6 +167,7 @@ class Config():
                 "cam4_v2": "/ssddg1/gaia/cam4_v2/cam4-famip-30m-timestep-second-upload",
                 "cam4_v3": "/ssddg1/gaia/cam4_v3/cam4-famip-30m-timestep-second-upload",
                 "cam4_v4": "/ssddg1/gaia/cam4_v4/cam4-famip-30m-timestep-second-upload",
+                "cam4_v5": "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload",
                 "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
                 "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
@@ -197,6 +198,7 @@ class Config():
         inputs = cli_args.get('dataset_params',{}).get("inputs",None)
         outputs = cli_args.get('dataset_params',{}).get("outputs",None)
         data_grid = cli_args.get('dataset_params',{}).get("data_grid",data_grid)
+        subsample_mode = cli_args.get('dataset_params',{}).get("subsample_mode", "random")
         
         dataset_params = dict(
             train=dict(
@@ -210,7 +212,8 @@ class Config():
                 space_filter =space_filter,
                 inputs = inputs,
                 outputs = outputs,
-                data_grid = data_grid
+                data_grid = data_grid,
+                subsample_mode = subsample_mode
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
@@ -223,7 +226,8 @@ class Config():
                 space_filter =space_filter,
                 inputs = inputs,
                 outputs = outputs,
-                data_grid = data_grid
+                data_grid = data_grid,
+                subsample_mode = subsample_mode
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
@@ -236,7 +240,8 @@ class Config():
                 space_filter =space_filter,
                 inputs = inputs,
                 outputs = outputs,
-                data_grid = data_grid
+                data_grid = data_grid,
+                subsample_mode = subsample_mode
             ),
             mean_thres=mean_thres,
             dataset = dataset
@@ -252,7 +257,8 @@ class Config():
             use_output_scaling=False,
             replace_std_with_range=False,
             ckpt=None,
-            lr_schedule = "cosine"
+            lr_schedule = "cosine",
+            weight_decay = 0
         )
         return model_params
         # return merge(model_params, cli_args.get('model_params',{}))

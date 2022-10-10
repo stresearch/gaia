@@ -1,4 +1,6 @@
 from turtle import forward
+from typing import OrderedDict
+import typing
 import torch
 from gaia import get_logger
 
@@ -17,7 +19,7 @@ class Normalization(torch.nn.Module):
         self.register_buffer("mean", mean[None, :, None, None])
         self.register_buffer("std", std[None, :, None, None])
 
-    def forward(self, x, normalize=True):
+    def forward(self, x, normalize : bool =True):
         if normalize:
             if len(x.shape) == 4:
                 return (x - self.mean) / self.std
@@ -33,6 +35,19 @@ class Normalization(torch.nn.Module):
             else:
                 raise ValueError("data must be either 2 or 4 dimensional")
 
+class NormalizationBN1D(torch.nn.Module):
+    def __init__(self, num_features, eps= 1e-9):
+        super().__init__()
+        self.bn = torch.nn.BatchNorm1d(num_features, affine = False, eps= eps)
+        
+    def forward(self, x, normalize=True):
+        if normalize:
+            return self.bn(x)
+        else:  # demormalize
+            return x * self.bn.running_var[None,:].sqrt() + self.bn.running_mean[None,:]
+
+
+
 
 class InterpolateGrid1D(torch.nn.Module):
     log_linear_vars = ("Q",)
@@ -44,19 +59,38 @@ class InterpolateGrid1D(torch.nn.Module):
         output_grid=None,
         input_grid_index=None,
         output_grid_index=None,
+        requires_grad = False
     ):
         super().__init__()
-        self.linear = torch.nn.Linear(len(input_grid), len(output_grid), bias=False)
+        self.linear = torch.nn.Linear(len(input_grid), len(output_grid), bias=False).requires_grad_(requires_grad)
         output_grid, input_grid = torch.tensor(output_grid), torch.tensor(input_grid)
         with torch.no_grad():
             self.linear.weight.data = make_interpolation_weights(
                 output_grid, input_grid
             )
         self.input_grid_index = input_grid_index
+
+        if output_grid_index is None:
+            n_levels = len(output_grid)
+            output_grid_index = OrderedDict()
+            s = 0
+            for k,v in input_grid_index.items():
+                var_size = v[1] - v[0]
+                e = s + n_levels if var_size > 1 else s + 1 # change all vector valued 
+                output_grid_index[k] =  [s,e]
+                s = e
+                
         self.output_grid_index = output_grid_index
 
     def forward(self, x):
         out = []
+
+        squeeze = False
+
+        if x.ndim == 1:
+            x = x[None,...]
+            squeeze = True
+
         for k in self.output_grid_index.keys():
             s, e = self.input_grid_index[k]
             if e - s == 1:
@@ -67,7 +101,12 @@ class InterpolateGrid1D(torch.nn.Module):
                 else:
                     out.append(self.linear(x[:, s:e]))
 
-        return torch.cat(out, -1)
+        out = torch.cat(out, -1)
+
+        if squeeze:
+            out =  out[0]
+
+        return out
 
 
 def make_interpolation_weights(output_grid, input_grid):

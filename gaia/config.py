@@ -257,7 +257,8 @@ class Config():
             use_output_scaling=False,
             replace_std_with_range=False,
             ckpt=None,
-            lr_schedule = "cosine"
+            lr_schedule = "cosine",
+            weight_decay = 0
         )
         return model_params
         # return merge(model_params, cli_args.get('model_params',{}))

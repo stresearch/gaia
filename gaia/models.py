@@ -186,6 +186,7 @@ class TrainingModel(LightningModule):
         if self.hparams.optimizer == "adam":
             optim = torch.optim.AdamW
         elif self.hparams.optimizer == "lamb":
+            import torch_optimizer
             optim = torch_optimizer.Lamb
         out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         if self.hparams.lr_schedule is not None:

@@ -8,6 +8,7 @@ This repository contains code for training and running climate neural network su
 
 [![](https://stresearch.github.io/gaia/sections/overview/overview_screenshot.png)](https://stresearch.github.io/gaia/)
 
+
 - [Installation](#installation)
 - [Data Preprocessing](#data-preprocessing)
   - [Example Toy Dataset](#example-toy-dataset)
@@ -23,7 +24,7 @@ This repository contains code for training and running climate neural network su
 - [Export Model for Integration](#export-model-for-integration)
 - [Pre-trained Models](#pre-trained-models)
 
-# Installation
+## Installation
 
 Install requirments: 
 
@@ -32,13 +33,13 @@ git clone https://github.com/stresearch/gaia
 pip install -r requirements
 ```
 
-# Data Preprocessing
+## Data Preprocessing
 
-## Example Toy Dataset
+### Example Toy Dataset
 
 We provide a toy dataset [here](https://4d41262f-0f54-45cc-b82b-6ba60be7a600-gaia-models.s3.amazonaws.com/actm_gallery/test). It's subsampled cam4 dataset.
 
-## Process Raw Dataset
+### Process Raw Dataset
 
 To prerocess large scale exports from climate model runs.  we work with outputs from two climate models: CAM4 and SPCAM. 
 - We assume raw data resides in an S3 bucket with one file per day in the `NCDF4` format. 
@@ -71,7 +72,7 @@ spcamclbm-nx-16-20m-timestep_4_train.pt  spcamclbm-nx-16-20m-timestep_4_var_inde
 
 Copy to machine where you want to train the model. For more details see [`gaia.data` module](https://github.com/stresearch/gaia/blob/c0268fa86aac53b04626ba77ebba1c76293f7557/gaia/data.py#L454)
 
-# Configuration Parameters
+## Configuration Parameters
 
 To perform training, we use a machine with at least a single GPU and 64GBs of RAM (to load the full dataset into memory, smaller for a toy dataset). To use the toy dataset, set the environmental variable `GAIA_TOY_DATA` prefix where it is located.
 
@@ -86,43 +87,43 @@ from gaia.config import Config
 
 os.environ["GAIA_TOY_DATA"] = "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload"
 
-inputs = """B_Q [t+1]
-B_T [t+1]
-B_U [t+1]
-B_V [t+1]
-B_OMEGA [t+1]
-B_Z3 [t+1]
-B_PS [t+1]
-SOLIN [t+1]
-B_SHFLX [t+1]
-B_LHFLX [t+1]
-LANDFRAC [t]
-OCNFRAC [t]
-ICEFRAC [t]
-FSNS [t]
-FLNS [t]
-FSNT [t]
-FLNT [t]
-FSDS [t]""".split("\n")
+inputs = ['B_Q [t+1]',
+ 'B_T [t+1]',
+ 'B_U [t+1]',
+ 'B_V [t+1]',
+ 'B_OMEGA [t+1]',
+ 'B_Z3 [t+1]',
+ 'B_PS [t+1]',
+ 'SOLIN [t+1]',
+ 'B_SHFLX [t+1]',
+ 'B_LHFLX [t+1]',
+ 'LANDFRAC [t]',
+ 'OCNFRAC [t]',
+ 'ICEFRAC [t]',
+ 'FSNS [t]',
+ 'FLNS [t]',
+ 'FSNT [t]',
+ 'FLNT [t]',
+ 'FSDS [t]']
 
-outputs = """A_PTTEND [t+1]
-A_PTEQ [t+1]
-FSNS [t+1]
-FLNS [t+1]
-FSNT [t+1]
-FLNT [t+1]
-FSDS [t+1]
-FLDS [t+1]
-SRFRAD [t+1]
-SOLL [t+1]
-SOLS [t+1]
-SOLLD [t+1]
-SOLSD [t+1]
-PRECT [t+1]
-PRECC [t+1]
-PRECL [t+1]
-PRECSC [t+1]
-PRECSL [t+1]""".split("\n")
+outputs = ['A_PTTEND [t+1]',
+ 'A_PTEQ [t+1]',
+ 'FSNS [t+1]',
+ 'FLNS [t+1]',
+ 'FSNT [t+1]',
+ 'FLNT [t+1]',
+ 'FSDS [t+1]',
+ 'FLDS [t+1]',
+ 'SRFRAD [t+1]',
+ 'SOLL [t+1]',
+ 'SOLS [t+1]',
+ 'SOLLD [t+1]',
+ 'SOLSD [t+1]',
+ 'PRECT [t+1]',
+ 'PRECC [t+1]',
+ 'PRECL [t+1]',
+ 'PRECSC [t+1]',
+ 'PRECSL [t+1]']
 
 config = Config(
         {
@@ -313,7 +314,7 @@ trainer_params:
 
 ```
 
-## Configuration Parameters Details
+### Configuration Parameters Details
 
 For default parameters consult `gaia.config.Config` class. There are three groups of parameters: `trainer_params, dataset_params, model_params` .
 
@@ -324,7 +325,7 @@ Parameters can be specified by
 
 Example configs:
 
-## Dataset Params
+### Dataset Params
 
 ```python
 dataset_params = 
@@ -345,7 +346,7 @@ dataset_params =
   'var_index_file': '/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4_var_index.pt'}}
 ```
 
-## Training Params
+### Training Params
 
 ```python
 training_params = 
@@ -353,7 +354,7 @@ training_params =
 
 ```
 
-## Model Params
+### Model Params
 
 ```python
 model_params = 
@@ -446,7 +447,7 @@ model_config = {
           "kernel_size": 3,
       }
 ```
-# Training
+## Training
 
 To train:
 
@@ -458,7 +459,7 @@ main(**config.config)
 After training the model is saved under `lightning_logs/version_XX` . All the parameters are also saved under `lightning_logs/version_XX/hparams.yaml`
 
 
-# Inference
+## Inference
 
 To use a model saved under saved under `lightning_logs/version_XX` pass the checkpoint path to `ckpt` argument and all the configuration will automatically load
 
@@ -485,7 +486,7 @@ main(**config.config)
 Predictions file will be written out to the experiment checkpoint.
 
 
-# Generate Diagnostic Plots
+## Generate Diagnostic Plots
 
 Plots will be saved in the experiment directory
 
@@ -495,7 +496,7 @@ save_gradient_plots(model_dir, device = f"cuda:{gpu}")
 save_diagnostic_plot(model_dir) 
 ```
 
-# Export Model for Integration
+## Export Model for Integration
 
 Export pretrained pytorch model to a torchscript checkpoint to be loaded into the intergrated hybrid model.
 
@@ -509,7 +510,7 @@ export(model_dir, export_name)
 
 ```
 
-# Pre-trained Models
+## Pre-trained Models
 
 To use a pretrained model:
 
@@ -542,6 +543,8 @@ model  = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir))
 ```
 
 Download pre-trained models:
-- [FCN CAM4](https://4d41262f-0f54-45cc-b82b-6ba60be7a600-gaia-models.s3.amazonaws.com/actm_gallery/test)
-- [FCN SPCAM](https://4d41262f-0f54-45cc-b82b-6ba60be7a600-gaia-models.s3.amazonaws.com/actm_gallery/test)
+
+- [FCN CAM4](https://4d41262f-0f54-45cc-b82b-6ba60be7a600-gaia-models.s3.amazonaws.com/actm_gallery/test)  
+- [FCN SPCAM](https://4d41262f-0f54-45cc-b82b-6ba60be7a600-gaia-models.s3.amazonaws.com/actm_gallery/test)  
+
 

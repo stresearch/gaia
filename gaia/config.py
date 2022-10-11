@@ -1,3 +1,4 @@
+import os
 from omegaconf import OmegaConf, DictConfig
 from mergedeep import merge
 import sys
@@ -160,6 +161,9 @@ class Config():
 
         base = cli_args.get('dataset_params',{}).get("prefix",None)
 
+        
+        cam4_toy_data = os.environ.get("GAIA_TOY_DATA", "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload")
+
         if base is None:
             dataset_paths = {
                 "cam4": "/ssddg1/gaia/cam4/cam4-famip-30m-timestep_4",
@@ -171,7 +175,8 @@ class Config():
                 "spcam": "/ssddg1/gaia/spcam/spcamclbm-nx-16-20m-timestep_4",
                 "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
-                "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4"
+                "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4",
+                "cam4_toy" : cam4_toy_data
             }
 
             dataset = cli_args.get('dataset_params',{}).get('dataset', None)

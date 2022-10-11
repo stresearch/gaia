@@ -1,6 +1,10 @@
 # GAIA: Global AI Accelerator <!-- omit in toc --> 
 
-This repository contains code for training and running climate neural network surrogate models. For detais on various experiments visit our site *https://stresearch.github.io/gaia/*
+This repository contains code for training and running climate neural network surrogate models. For detais on various experiments visit our site https://stresearch.github.io/gaia/
+
+The GAIA team is a collaboration between:  
+- [STR](https://www.str.us)  
+- [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)  
 
  ***Warning:** This is an active research project. The code base is constantly evolving as new features are being added and old ones are depreciated.*
 

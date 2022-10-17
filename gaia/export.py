@@ -1,4 +1,3 @@
-from asyncio.log import logger
 from collections import OrderedDict
 import warnings
 from pathlib import Path
@@ -161,11 +160,16 @@ class ModelForExportSimple(torch.nn.Module):
         self.model = training_model.model
         self.debug = debug
 
+        if "positive_output_pattern" in training_model.hparams:
+            self.output_processor = training_model.output_processor
+        else:
+            self.output_processor = torch.nn.Identity()
+
         if training_model.hparams.zero_outputs:
             zero_output = training_model.loss_output_weights[None,:] == 0
         else:
             output_dim = list(training_model.hparams.output_index.values())[-1][-1]
-            zero_output = torch.ones(output_dim, 1).bool()
+            zero_output = torch.zeros(output_dim, 1).bool()
 
         self.register_buffer("zero_output", zero_output)
 
@@ -183,6 +187,7 @@ class ModelForExportSimple(torch.nn.Module):
         x_norm = self.input_normalize(x)
 
         y = self.model(x_norm)
+        y = self.output_processor(y)
         y = self.output_normalize(y, normalize=False)
         y = y.masked_fill_(self.zero_output,0.)
 

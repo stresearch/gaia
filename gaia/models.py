@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from gaia import get_logger
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (Conv2dDS, FCLayer, InterpolateGrid1D,
-                         MultiIndexEmbedding, Normalization, NormalizationBN1D,
+                         MultiIndexEmbedding, Normalization, NormalizationBN1D, OutputProcesser,
                          ResDNNLayer, make_interpolation_weights)
 from gaia.optim import get_cosine_schedule_with_warmup
 from gaia.unet.unet import UNet
@@ -40,6 +40,7 @@ class TrainingModel(LightningModule):
         noise_sigma = 0,
         unit_normalize = False,
         weight_decay = 0,
+        positive_output_pattern = None,
         **kwargs,
     ):
         super().__init__()
@@ -85,7 +86,13 @@ class TrainingModel(LightningModule):
             # w *= w.shape[0] / w.sum()
             self.make_output_weights(loss_output_weights)
         else:
-            self.hparams.zero_output = False          
+            self.hparams.zero_outputs = False          
+
+        if positive_output_pattern is not None:
+            positive_output_mask = torch.cat([torch.ones(e-s).bool() if positive_output_pattern in k else torch.zeros(e-s).bool()  for k,(s,e) in output_index.items()])
+            self.output_processor = OutputProcesser(positive_output_mask)
+        else:
+            self.output_processor = torch.nn.Identity()
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -210,6 +217,8 @@ class TrainingModel(LightningModule):
             y = self.model(x, index=index)
         else:
             y = self.model(x)
+
+        y = self.output_processor(y)
 
         if self.hparams.zero_outputs:
             y = y.masked_fill_(self.loss_output_weights[None,:] == 0,0.)

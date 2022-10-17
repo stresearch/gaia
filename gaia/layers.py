@@ -1,5 +1,4 @@
-from turtle import forward
-from typing import OrderedDict
+from collections import OrderedDict
 import typing
 import torch
 from gaia import get_logger
@@ -225,4 +224,18 @@ class FCLayer(torch.nn.Module):
         x = self.drop_out(x)
         x = self.relu(x)
 
+        return x
+    
+
+
+
+class OutputProcesser(torch.nn.Module):
+    def __init__(self, positive_output_mask):
+        super().__init__()
+        if not isinstance(positive_output_mask, torch.Tensor):
+            positive_output_mask = torch.tensor(positive_output_mask).bool()
+        self.register_buffer("positive_output_mask",positive_output_mask)
+
+    def forward(self, x):
+        x[:,self.positive_output_mask,...] = x[:,self.positive_output_mask,...].exp()
         return x

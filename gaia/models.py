@@ -1,25 +1,20 @@
+import os
 from collections import OrderedDict
 from math import ceil
 from typing import Optional
-from pytorch_lightning import LightningModule
+
 import torch
-from torch.nn import functional as F
-from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
-from gaia.layers import (
-    Conv2dDS,
-    FCLayer,
-    InterpolateGrid1D,
-    MultiIndexEmbedding,
-    Normalization,
-    NormalizationBN1D,
-    ResDNNLayer,
-    make_interpolation_weights,
-)
-import os
-from gaia.unet.unet import UNet
 import torch.nn.functional as F
-from gaia.optim import get_cosine_schedule_with_warmup
+from pytorch_lightning import LightningModule
+from torch.nn import functional as F
+
 from gaia import get_logger
+from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
+from gaia.layers import (Conv2dDS, FCLayer, InterpolateGrid1D,
+                         MultiIndexEmbedding, Normalization, NormalizationBN1D,
+                         ResDNNLayer, make_interpolation_weights)
+from gaia.optim import get_cosine_schedule_with_warmup
+from gaia.unet.unet import UNet
 
 logger = get_logger(__name__)
 
@@ -188,7 +183,13 @@ class TrainingModel(LightningModule):
         elif self.hparams.optimizer == "lamb":
             import torch_optimizer
             optim = torch_optimizer.Lamb
-        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+
+        if self.hparams.weight_decay > 0 :
+            logger.info("setting l2 / weight decay regularization 0 for bias terms and batch norm scale")
+            params = [{'params':p, 'lr': self.hparams.lr, "weight_decay":self.hparams.weight_decay if len(p.shape) > 1 else 0.} for p in self.parameters()]
+            out["optimizer"] = optim(params)
+        else:
+            out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         if self.hparams.lr_schedule is not None:
             if self.hparams.lr_schedule == "cosine":
                 out["lr_scheduler"] = {

@@ -1109,4 +1109,4 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
 
 
     normalized_gradient  = hv.HeatMap((input_vars, output_vars, np.tanh(J)),["input","output"],["gradient"]).opts(colorbar= True, symmetric=True, cmap = "coolwarm", width = 1900, height = 1000, xrotation = 90, tools = ["hover"])
-    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh_train.html"))
+    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh.html"))

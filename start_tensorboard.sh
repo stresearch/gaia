@@ -1,1 +1,1 @@
-tensorboard --logdir lightning_logs_integration_fixed --bind_all --port 8999
+tensorboard --logdir lightning_logs --bind_all --port 8999 --load_fast true

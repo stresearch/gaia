@@ -820,13 +820,13 @@ def get_dataset(
         else:
             logger.info(f"using weighted subsample mode from file :{subsample_mode}")
             lat_lon_weights = torch.load(subsample_mode)
-            # sample_weights = lat_lon_weights[index[:,0], index[:,1]]
+            sample_weights = lat_lon_weights[index[:,0], index[:,1]]
             number_of_samples = tensor_list[0].shape[0]//subsample
-            lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
+            # lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
 
-            lat_lon_weights_sorted, sorted_index = lat_lon_weights.ravel().sort(descending = True)
+            lat_lon_weights_sorted, sorted_index = sample_weights.ravel().sort(descending = True)
             lat_lon_weights_sorted /= lat_lon_weights_sorted.sum()
-            lat_lon_weights_sorted_cumsum = lat_lon_weights_sorted.cumsum()
+            lat_lon_weights_sorted_cumsum = lat_lon_weights_sorted.cumsum(0)
 
             sample_index = torch.searchsorted(lat_lon_weights_sorted_cumsum, torch.rand(number_of_samples))
             sample_index = sorted_index[sample_index]

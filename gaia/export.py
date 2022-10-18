@@ -213,11 +213,12 @@ def export(model_dir, export_name, inputs=None, outputs=None, debug = False, mod
         logger.info("assuming model has correct inputs and outputs, using simple export")
         model_for_export = ModelForExportSimple(model, debug=debug).eval().requires_grad_(False)
     else:
+        raise NotImplementedError
         model_for_export = ModelForExport(model, inputs, outputs, debug=debug).eval().requires_grad_(False)
 
     # TODO dont hard code this
     input_dim = list(model.hparams.input_index.values())[-1][-1]
-    example = torch.rand(10, input_dim)
+    example = torch.randn(10, input_dim)
     logger.info("running dummy example thru original model")
 
     out = model_for_export(example)

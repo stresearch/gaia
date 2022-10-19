@@ -120,7 +120,7 @@ class Config():
         )
         self.config = merge(config, cli_args)
 
-        logger.info(f"Config: \n{self}")
+        # logger.info(f"Config: \n{self}")
 
 
     def __repr__(self) -> str:

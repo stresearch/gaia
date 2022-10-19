@@ -11,8 +11,9 @@ from torch.nn import functional as F
 from gaia import get_logger
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (Conv2dDS, FCLayer, InterpolateGrid1D,
-                         MultiIndexEmbedding, Normalization, NormalizationBN1D, OutputProcesser,
-                         ResDNNLayer, make_interpolation_weights)
+                         MultiIndexEmbedding, Normalization, NormalizationBN1D,
+                         OutputProcesser, ResDNNLayer,
+                         make_interpolation_weights)
 from gaia.optim import get_cosine_schedule_with_warmup
 from gaia.unet.unet import UNet
 
@@ -90,7 +91,12 @@ class TrainingModel(LightningModule):
             self.hparams.zero_outputs = False          
 
         if positive_output_pattern is not None:
-            positive_output_mask = torch.cat([torch.ones(e-s).bool() if positive_output_pattern in k else torch.zeros(e-s).bool()  for k,(s,e) in output_index.items()])
+            def match(n):
+                return any([n.startswith(p) for p in positive_output_pattern.split(",")])
+
+            # positive_output_mask = torch.cat([torch.ones(e-s).bool() if positive_output_pattern in k else torch.zeros(e-s).bool()  for k,(s,e) in output_index.items()])
+            positive_output_mask = torch.cat([torch.ones(e-s).bool() if match(k) else torch.zeros(e-s).bool() for k,(s,e) in output_index.items()])
+            logger.info(f"adding {positive_output_mask.sum()} positiive constraints to outputs")
             self.output_processor = OutputProcesser(positive_output_mask, positive_func)
         else:
             self.output_processor = torch.nn.Identity()

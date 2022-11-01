@@ -1,7 +1,7 @@
 import os
 from collections import OrderedDict
 from math import ceil
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -16,6 +16,7 @@ from gaia.layers import (Conv2dDS, FCLayer, InterpolateGrid1D,
                          make_interpolation_weights)
 from gaia.optim import get_cosine_schedule_with_warmup
 from gaia.unet.unet import UNet
+from torch.nn.utils import clip_grad
 
 logger = get_logger(__name__)
 
@@ -96,7 +97,7 @@ class TrainingModel(LightningModule):
 
             # positive_output_mask = torch.cat([torch.ones(e-s).bool() if positive_output_pattern in k else torch.zeros(e-s).bool()  for k,(s,e) in output_index.items()])
             positive_output_mask = torch.cat([torch.ones(e-s).bool() if match(k) else torch.zeros(e-s).bool() for k,(s,e) in output_index.items()])
-            logger.info(f"adding {positive_output_mask.sum()} positiive constraints to outputs")
+            logger.info(f"adding {positive_output_mask.sum()} positive constraints to outputs")
             self.output_processor = OutputProcesser(positive_output_mask, positive_func)
         else:
             self.output_processor = torch.nn.Identity()
@@ -218,6 +219,10 @@ class TrainingModel(LightningModule):
                 raise ValueError(f"unknown lr scheduler {self.hparams.lr_schedule}")
 
         return out
+    
+    # def configure_gradient_clipping(self, optimizer, optimizer_idx, gradient_clip_val: Optional[Union[int, float]] = None, gradient_clip_algorithm: Optional[str] = None):
+    #     for p in optimizer.param_groups:
+    #         clip_grad.clip_grad_norm_(p["params"], gradient_clip_val)
 
     def forward(self, x, index=None):
         if index is not None:

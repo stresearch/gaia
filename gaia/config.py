@@ -176,7 +176,8 @@ class Config():
                 "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4",
-                "cam4_toy" : cam4_toy_data
+                "cam4_toy" : cam4_toy_data,
+                "cam4_upload4_v1": "/ssddg1/gaia/cam4_upload4_v1/cam4-famip-30m-timestep-with-b_relhum-4rth-upload",
             }
 
             dataset = cli_args.get('dataset_params',{}).get('dataset', None)

@@ -12,6 +12,23 @@ from gaia import get_logger
 logger = get_logger(__name__)
 
 
+
+def weighted_sample(sample_weights, number_of_samples, unique = True):
+    # sample_weights = lat_lon_weights[index[:,0], index[:,1]]
+    # number_of_samples = tensor_list[0].shape[0]//subsample
+    # lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
+
+    sample_weights_sorted, sorted_index = sample_weights.sort(descending = True)
+    sample_weights_sorted /= sample_weights_sorted.sum()
+    sample_weights_sorted_cumsum = sample_weights_sorted.cumsum(0)
+
+    sample_index = torch.searchsorted(sample_weights_sorted_cumsum, torch.rand(number_of_samples))
+    sample_index = sorted_index[sample_index]
+    if unique:
+        sample_index = torch.unique(sample_index)
+
+    return sample_index
+
 def get_polies():
     polies = get_land_polies()
     combined_poly = []

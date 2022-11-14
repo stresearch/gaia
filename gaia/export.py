@@ -165,6 +165,13 @@ class ModelForExportSimple(torch.nn.Module):
         else:
             self.output_processor = torch.nn.Identity()
 
+
+        if training_model.hparams.get("use_rel_hum_constraint",False):
+            logger.info("adding rel humidity constraint to moinsture tendencies")
+            self.rel_hum_constraint = training_model.rel_hum_constraint
+        else:
+            self.rel_hum_constraint = torch.nn.Identity()
+
         if training_model.hparams.zero_outputs:
             zero_output = training_model.loss_output_weights[None,:] == 0
         else:
@@ -187,6 +194,7 @@ class ModelForExportSimple(torch.nn.Module):
         x_norm = self.input_normalize(x)
 
         y = self.model(x_norm)
+        y = self.rel_hum_constraint(x_norm, y)
         y = self.output_processor(y)
         y = self.output_normalize(y, normalize=False)
         y = y.masked_fill_(self.zero_output,0.)

@@ -1055,13 +1055,13 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
 
     def func(x):
         xnorm = model.input_normalize(x)
-        ynorm = model.model(xnorm)
-        # ynorm = model(xnorm)
+        # ynorm = model.model(xnorm)
+        ynorm = model(xnorm)
         return model.output_normalize(ynorm,normalize = False).sum(0)
 
     def func_norm(x):
-        return model.model(x).sum(0)
-        # return model(x).sum(0)
+        # return model.model(x).sum(0)
+        return model(x).sum(0)
 
 
     test_dataset, test_dataloader = get_dataset_from_model(model, split = "test")
@@ -1079,7 +1079,7 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
         random_index =torch.randperm(len(test_dataset["x"]))[:N]
         xsample = model.input_normalize(test_dataset["x"][random_index].to(device)).clone().requires_grad_(True)
 
-        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=True).mean(1).cpu().numpy()
+        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=False).mean(1).cpu().numpy()
 
     else:
         ValueError()
@@ -1117,4 +1117,4 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
     
     normalized_gradient = normalized_gradient.redim.range(gradient = (-1.,1.))
 
-    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh_v2.html"))
+    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh.html"))

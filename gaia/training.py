@@ -48,7 +48,9 @@ def update_model_params_from_dataset(
 
     model_params["model_config"].update(
         {
-            "input_size": list(dataset_dict["input_index"].values())[-1][-1], #ordered dict of {"var":(s,e)}
+            "input_size": list(dataset_dict["input_index"].values())[-1][
+                -1
+            ],  # ordered dict of {"var":(s,e)}
             "output_size": list(dataset_dict["output_index"].values())[-1][-1],
         }
     )
@@ -71,14 +73,12 @@ def update_model_params_from_dataset(
         logger.info(f"ignoring {ignore_outputs.sum()} outputs with mean < {mean_thres}")
 
         if levels:
-            
 
-            if model_params.get("upweigh_low_levels",False):
+            if model_params.get("upweigh_low_levels", False):
                 logger.info("upweighing low levels")
-                level_weights = torch.linspace(.1,1.,len(levels))
+                level_weights = torch.linspace(0.1, 1.0, len(levels))
             else:
                 level_weights = torch.tensor([0] + levels).diff()
-
 
             temp = []
             for o, (s, e) in dataset_dict["output_index"].items():
@@ -92,6 +92,7 @@ def update_model_params_from_dataset(
             loss_output_weights = level_weights * loss_output_weights
 
         model_params["loss_output_weights"] = loss_output_weights.tolist()
+
 
 def load_hparams_file(model_dir):
     yaml_file = os.path.join(model_dir, "hparams.yaml")
@@ -114,12 +115,12 @@ def main(
     trainer_params=Config.set_trainer_params(),
     dataset_params=Config.set_dataset_params(),
     model_params=Config.set_model_params(),
-    seed=True,
+    seed=345,
     interpolation_params=None,
 ):
-    if seed:
+    if seed is not None:
         logger.info("seeding everything")
-        pl.seed_everything(345)
+        pl.seed_everything(seed)
 
     model_dir = None
 
@@ -136,13 +137,18 @@ def main(
 
         logger.info("**** TRAINING ******")
 
-        model_grid = model_params.get("model_grid", dataset_params["train"]["data_grid"])
+        model_grid = model_params.get(
+            "model_grid", dataset_params["train"]["data_grid"]
+        )
 
-        train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
-        val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
+        train_dataset, train_dataloader = get_dataset(
+            **dataset_params["train"], model_grid=model_grid
+        )
+        val_dataset, val_dataloader = get_dataset(
+            **dataset_params["val"], model_grid=model_grid
+        )
 
         mean_thres = dataset_params["mean_thres"]
-
 
         update_model_params_from_dataset(
             train_dataset,
@@ -174,39 +180,42 @@ def main(
 
     if "finetune" in mode:
 
-
-
         logger.info("**** FINE TUNING ******")
 
         if model_dir is None:
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
 
-        model_params_to_update = {k:model_params[k] for k in ["lr","lr_schedule"]}
+        model_params_to_update = {k: model_params[k] for k in ["lr", "lr_schedule"]}
         model_params_to_update["dataset_params"] = dataset_params
         model_params_to_update["is_finetuned"] = True
 
-        model = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), fine_tuning = False, map_location="cpu", **model_params_to_update)
-
+        model = TrainingModel.load_from_checkpoint(
+            get_checkpoint_file(model_dir),
+            fine_tuning=False,
+            map_location="cpu",
+            **model_params_to_update,
+        )
 
         # disable everything but last later
         # model.requires_grad_(False)
         # model.model.model[-1].requires_grad_(True)
 
-        
         model_grid = model.hparams.get("model_grid", None)
 
         assert model_grid
 
-        train_dataset, train_dataloader = get_dataset(**dataset_params["train"], model_grid = model_grid)
-        val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid = model_grid)
+        train_dataset, train_dataloader = get_dataset(
+            **dataset_params["train"], model_grid=model_grid
+        )
+        val_dataset, val_dataloader = get_dataset(
+            **dataset_params["val"], model_grid=model_grid
+        )
 
         assert train_dataset["input_index"] == model.hparams.input_index
         assert train_dataset["output_index"] == model.hparams.output_index
 
         mean_thres = dataset_params["mean_thres"]
-
-        
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
@@ -223,7 +232,6 @@ def main(
 
         logger.info("**** VALIDATING ******")
 
-
         if model_dir is None:
             assert "ckpt" in model_params
             model_dir = model_params["ckpt"]
@@ -233,7 +241,9 @@ def main(
 
         if val_dataloader is None:
             if dataset_params is None:
-                logger.info("no dataset_params provided, using saved ones in checkpoint")
+                logger.info(
+                    "no dataset_params provided, using saved ones in checkpoint"
+                )
                 dataset_params = model.hparams.dataset_params
 
                 # if "var_index_file" not in model.hparams.dataset_params["val"]:
@@ -244,7 +254,10 @@ def main(
                 #         "_val.pt", "_var_index.pt"
                 #     )
 
-            val_dataset, val_dataloader = get_dataset(**dataset_params["val"],model_grid= model.hparams.get("model_grid", None) )
+            val_dataset, val_dataloader = get_dataset(
+                **dataset_params["val"],
+                model_grid=model.hparams.get("model_grid", None),
+            )
 
         if trainer is None:
             trainer = pl.Trainer(
@@ -280,17 +293,15 @@ def main(
             #     ] = model.hparams.dataset_params["test"]["dataset_file"].replace(
             #         "_test.pt", "_var_index.pt"
             #     )
-            
-            dataset_params = model.hparams.dataset_params
 
-        
+            dataset_params = model.hparams.dataset_params
 
         # model.hparams.dataset_params["test"]["batch_size"] = 96*144
 
         model_grid = model.hparams.get("model_grid", None)
         if model_grid is None:
             logger.info("model grid is not found... trying to infer from dataset")
-            dataset = model.hparams.dataset_params.get("dataset",None)
+            dataset = model.hparams.dataset_params.get("dataset", None)
             if dataset:
                 model_grid = get_levels(dataset)
 
@@ -300,32 +311,29 @@ def main(
             logger.warning("split for testing is not set to test? is that right")
 
         test_dataset, test_dataloader = get_dataset(
-            **dataset_params[split], model_grid = model_grid
+            **dataset_params[split], model_grid=model_grid
         )
-
-        
 
         if "test" in mode:
             logger.info("**** TESTING ******")
 
             trainer = pl.Trainer(
-            checkpoint_callback=False,
-            logger=False,
-            **trainer_params,
+                checkpoint_callback=False,
+                logger=False,
+                **trainer_params,
             )
-
 
             test_results = trainer.test(model, dataloaders=test_dataloader)
             # run_dir = os.path.split(os.path.split(model_params["ckpt"])[0])[0]
-            dataset = dataset_params.get("dataset","")
+            dataset = dataset_params.get("dataset", "")
             path_to_save = os.path.join(model_dir, f"{split}_results_{dataset}.json")
             json.dump(test_results, open(path_to_save, "w"))
 
         if "predict" in mode:
-            
+
             logger.info("**** PREDICTING ******")
-            
-            dataset = dataset_params.get("dataset","")
+
+            dataset = dataset_params.get("dataset", "")
             prediction_file_name = f"predictions_{dataset}.pt"
 
             trainer = pl.Trainer(
@@ -363,27 +371,22 @@ def main(
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)
 
-
     return model_dir
 
 
-
-def get_dataset_from_model(model, split = "test"):
+def get_dataset_from_model(model, split="test"):
 
     model_grid = model.hparams.get("model_grid", None)
     if model_grid is None:
         logger.info("model grid is not found... trying to infer from dataset")
-        dataset = model.hparams.dataset_params.get("dataset",None)
+        dataset = model.hparams.dataset_params.get("dataset", None)
         if dataset:
             model_grid = get_levels(dataset)
 
-
     dataset_params = model.hparams.dataset_params
 
-
     test_dataset, test_dataloader = get_dataset(
-            **dataset_params[split], model_grid = model_grid
-        )
+        **dataset_params[split], model_grid=model_grid
+    )
 
     return test_dataset, test_dataloader
-

@@ -99,7 +99,7 @@ class Config():
                 cli_args.pop(k)
 
         mode = 'train,val,test'
-        seed = True
+        seed = 345
         
         # set trainer params 
         trainer_params = self.set_trainer_params(cli_args)

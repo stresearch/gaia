@@ -53,6 +53,7 @@ class TrainingModel(LightningModule):
         positive_output_pattern=None,
         positive_func="exp",
         use_rel_hum_constraint=False,
+        use_rel_hum_reg = False,
         **kwargs,
     ):
         super().__init__()
@@ -122,10 +123,18 @@ class TrainingModel(LightningModule):
             self.output_processor = torch.nn.Identity()
 
         if use_rel_hum_constraint:
-            logger.info("adding rel humidity constraint to moinsture tendencies")
+            logger.info("adding rel humidity constraint to moisture tend")
             self.rel_hum_constraint = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize)
         else:
             self.rel_hum_constraint = torch.nn.Identity()
+
+        self.regs = []
+
+        if use_rel_hum_reg:
+            logger.info("adding rel humidity reg to moisture tend")
+            self.rel_hum_reg = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize, ub = 100, lb = 0)
+            self.regs.append("rel_hum")
+
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -345,6 +354,10 @@ class TrainingModel(LightningModule):
 
         losses_to_reduce = []
 
+        if self.hparams.use_rel_hum_reg:
+            losses_to_reduce.append("rel_hum")
+            loss["rel_hum"] = self.rel_hum_reg(x,yhat, mode = "as_regularization")
+
         if self.hparams.loss == "mse":
             mse = F.mse_loss(y, yhat, reduction="none")
 
@@ -404,7 +417,13 @@ class TrainingModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.step(batch, "train")
-        return loss[self.hparams.loss]
+        out = loss[self.hparams.loss]
+
+        #adding reg terms
+        for r in self.regs:
+            out += loss[r]
+
+        return out
 
     def validation_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "val")

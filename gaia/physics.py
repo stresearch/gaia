@@ -122,53 +122,77 @@ class RelHumConstraint(torch.nn.Module):
             mask[s:e] = True
             self.register_buffer(v,mask)
 
-    def forward(self, x, y, time_step_seconds=30 * 60):
+    def forward(self, x, y, time_step_seconds=30 * 60, mode = "as_output"):
 
         x_denorm = self.input_normalize(x,False)
         y_denorm = self.output_normalize(y,False)
 
-        ps, q, t = [
-            x_denorm[:, self.index[v][0] : self.index[v][1]] for v in ["B_PS", "B_Q", "B_T"]
-        ]
-        dt = y_denorm[:, self.index["A_PTTEND"][0] : self.index["A_PTTEND"][1]]
-        
+        if mode == "as_output":
 
-        t1 = t + dt * time_step_seconds
+            ps, q, t = [
+                x_denorm[:, self.index[v][0] : self.index[v][1]] for v in ["B_PS", "B_Q", "B_T"]
+            ]
+            dt = y_denorm[:, self.index["A_PTTEND"][0] : self.index["A_PTTEND"][1]]
+            
 
-        ub = (
-            self.hum_conversion(self.ub, t1, ps, mode="rel2spec") - q
-        ) / time_step_seconds
+            t1 = t + dt * time_step_seconds
 
-        lb = (
-            self.hum_conversion(self.lb, t1, ps, mode="rel2spec") - q
-        ) / time_step_seconds
+            ub = (
+                self.hum_conversion(self.ub, t1, ps, mode="rel2spec") - q
+            ) / time_step_seconds
 
-
-        ## normalize them back
-
-        dq_std = self.output_normalize.std[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1], 0, 0]
-        
-        dq = y[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1]]
-
-        ub = ub / dq_std
-        lb = lb / dq_std
+            lb = (
+                self.hum_conversion(self.lb, t1, ps, mode="rel2spec") - q
+            ) / time_step_seconds
 
 
-        if self.activation == "sigmoid":
-            dq = torch.sigmoid(dq) * (ub - lb) + lb
-        elif self.activation == "clip":
-            # dq =  dq.clip(min=-1, max=1)
-            dq = torch.min(dq,ub)
-            dq = torch.max(dq,lb)
-            # dq = dq*2
+            ## normalize them back
+
+            dq_std = self.output_normalize.std[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1], 0, 0]
+            
+            dq = y[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1]]
+
+            ub = ub / dq_std
+            lb = lb / dq_std
+
+
+            if self.activation == "sigmoid":
+                dq = torch.sigmoid(dq) * (ub - lb) + lb
+            elif self.activation == "clip":
+                # dq =  dq.clip(min=-1, max=1)
+                dq = torch.min(dq,ub)
+                dq = torch.max(dq,lb)
+                # dq = dq*2
+            else:
+                raise ValueError(f"unknown activation {self.activation}")
+
+            # not sure why I need to clone but otherwise it erros
+            out = y.clone()
+            
+            out[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1]] = dq
+
+            return out
+        elif mode == "as_regularization":
+            ps, q, t = [
+                x_denorm[:, self.index[v][0] : self.index[v][1]] for v in ["B_PS", "B_Q", "B_T"]
+            ]
+            dt,dq = [y_denorm[:, self.index[v][0] : self.index[v][1]] for v in ["A_PTTEND", "A_PTEQ"]]
+            
+            t1 = t + dt * time_step_seconds
+            q1 = q + dq * time_step_seconds
+
+
+            relhum = self.hum_conversion(q1, t1, ps, mode="spec2rel")
+
+            # let's output the same size so that we can apply weighing scheme ... prob wasteful but ok for now
+            reg = torch.zeros_like(y)
+            reg[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1]] = torch.relu((relhum - self.ub)/100.).square() + torch.relu(-(relhum - self.lb)/100.).square()
+
+            return reg
+
+
         else:
-            raise ValueError(f"unknown activation {self.activation}")
-
-        out = y.clone()
-        
-        out[:,self.index["A_PTEQ"][0] : self.index["A_PTEQ"][1]] = dq
-
-        return out
+            raise ValueError(f"uknown mode {mode}")
 
 
 # # unconstrained

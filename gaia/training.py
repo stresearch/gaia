@@ -16,7 +16,7 @@ import glob
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
 from gaia.plot import levels26, levels
 from gaia.config import get_levels
 import yaml
@@ -161,13 +161,23 @@ def main(
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
+        callbacks=[checkpoint_callback, LearningRateMonitor()]
+
+        swa_lrs =  model_params.get("swa_lrs",None)
+        if swa_lrs is not None:
+            logger.info("using SWA")
+            swa = StochasticWeightAveraging(swa_lrs=swa_lrs)
+            callbacks.append(swa)
+
         # write_graph = WriteGraph()
 
         trainer = pl.Trainer(
-            callbacks=[checkpoint_callback, LearningRateMonitor()],
+            callbacks=callbacks,
             log_every_n_steps=max(1, len(train_dataloader) // 100),
             **trainer_params,
         )
+
+
 
         if model_params.get("ckpt", None) is not None:
             logger.info(f"loading existing ckpt {model_params}")

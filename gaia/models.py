@@ -125,8 +125,7 @@ class TrainingModel(LightningModule):
         if use_rel_hum_constraint:
             logger.info("adding rel humidity constraint to moisture tend")
             self.rel_hum_constraint = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize)
-        else:
-            self.rel_hum_constraint = torch.nn.Identity()
+
 
         self.regs = []
 
@@ -135,7 +134,7 @@ class TrainingModel(LightningModule):
             self.rel_hum_reg = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize, ub = 100, lb = 0)
             self.regs.append("rel_hum")
 
-
+            
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
 

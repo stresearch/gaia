@@ -1,10 +1,12 @@
 from collections import OrderedDict
+from datetime import date
 import json
 import os
 from cv2 import log
 
 from gaia.callbacks import WriteGraph
 from gaia.evaluate import process_results
+from gaia.export import export
 from gaia.models import ComputeStats, TrainingModel
 from gaia.data import (
     make_dummy_dataset,
@@ -157,7 +159,7 @@ def main(
             levels=model_grid,
         )
 
-        model = TrainingModel(dataset_params=dataset_params, **model_params)
+        model = TrainingModel(dataset_params=dataset_params, seed = seed, **model_params)
 
         checkpoint_callback = ModelCheckpoint(monitor="val_mse", mode="min")
 
@@ -171,9 +173,15 @@ def main(
 
         # write_graph = WriteGraph()
 
+
+        from pytorch_lightning.profilers import SimpleProfiler
+
+        profiler = SimpleProfiler(dirpath=".", filename="perf_logs")
+
         trainer = pl.Trainer(
             callbacks=callbacks,
             log_every_n_steps=max(1, len(train_dataloader) // 100),
+            profiler = profiler,
             **trainer_params,
         )
 
@@ -380,6 +388,17 @@ def main(
         #     other_predictions = "lightning_logs_compare_models/cam4_nn/predictions_on_spcam.pt"
 
         process_results(model_dir, levels=None, other_predictions=other_predictions)
+
+    if "export" in mode:
+        timestamp = date.today().strftime("%m-%d-%y")
+        export_name = f"export_model_{timestamp}.pt"
+        export(model_dir, export_name, inputs=None, outputs=None)
+
+
+    if "plot" in mode:
+        from gaia.plot import save_diagnostic_plot, save_gradient_plots
+        save_gradient_plots(model_dir, device=f"cuda:{trainer_params['gpus'][0]}")
+        save_diagnostic_plot(model_dir)
 
     return model_dir
 

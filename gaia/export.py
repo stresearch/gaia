@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 import torch
 from gaia.models import TrainingModel
-from gaia.training import get_checkpoint_file
+from gaia.misc import get_checkpoint_file
 import os
 from gaia import get_logger
 import yaml

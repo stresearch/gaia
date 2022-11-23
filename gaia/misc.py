@@ -1,3 +1,5 @@
+import glob
+import os
 import torch
 import tqdm.auto as tqdm
 import plotly.express as px
@@ -10,6 +12,19 @@ import imageio_ffmpeg
 from gaia import get_logger
 
 logger = get_logger(__name__)
+
+
+def get_checkpoint_file(file):
+    if file.endswith(".ckpt"):
+        return file
+    else:
+        # assume its a directory
+        pattern = os.path.join(file, "checkpoints", "*.ckpt")
+        files = glob.glob(pattern)
+        if len(files) > 0:
+            return files[0]
+        else:
+            raise FileNotFoundError(f"no ckpt files found in {pattern}")
 
 
 

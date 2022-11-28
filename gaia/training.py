@@ -165,23 +165,23 @@ def main(
 
         callbacks=[checkpoint_callback, LearningRateMonitor()]
 
-        swa_lrs =  model_params.get("swa_lrs",None)
-        if swa_lrs is not None:
-            logger.info("using SWA")
-            swa = StochasticWeightAveraging(swa_lrs=swa_lrs)
-            callbacks.append(swa)
+        # swa_lrs =  model_params.get("swa_lrs",None)
+
+        # if swa_lrs is not None:
+        #     logger.info("using SWA")
+        #     swa = StochasticWeightAveraging(swa_lrs=swa_lrs)
+        #     callbacks.append(swa)
 
         # write_graph = WriteGraph()
 
 
-        from pytorch_lightning.profilers import SimpleProfiler
+        # from pytorch_lightning.profilers import SimpleProfiler
 
-        profiler = SimpleProfiler(dirpath=".", filename="perf_logs")
+        # profiler = SimpleProfiler(dirpath=".", filename="perf_logs")
 
         trainer = pl.Trainer(
             callbacks=callbacks,
             log_every_n_steps=max(1, len(train_dataloader) // 100),
-            profiler = profiler,
             **trainer_params,
         )
 
@@ -336,7 +336,7 @@ def main(
             logger.info("**** TESTING ******")
 
             trainer = pl.Trainer(
-                checkpoint_callback=False,
+                enable_checkpointing=False,
                 logger=False,
                 **trainer_params,
             )
@@ -356,7 +356,7 @@ def main(
 
             trainer = pl.Trainer(
                 log_every_n_steps=max(1, len(test_dataloader) // 100),
-                checkpoint_callback=False,
+                enable_checkpointing=False,
                 logger=False,
                 **trainer_params,
             )

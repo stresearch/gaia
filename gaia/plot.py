@@ -1051,13 +1051,17 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
     # model_dir = "/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs_integraion_fixed/version_2_100_no_TS"
     model  = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), map_location="cpu").eval().requires_grad_(False).to(device)
 
+    # model.hparams.use_rel_hum_constraint = False
+
     def func(x):
         xnorm = model.input_normalize(x)
-        ynorm = model.model(xnorm)
+        # ynorm = model.model(xnorm)
+        ynorm = model(xnorm)
         return model.output_normalize(ynorm,normalize = False).sum(0)
 
     def func_norm(x):
-        return model.model(x).sum(0)
+        # return model.model(x).sum(0)
+        return model(x).sum(0)
 
 
     test_dataset, test_dataloader = get_dataset_from_model(model, split = "test")
@@ -1075,7 +1079,7 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
         random_index =torch.randperm(len(test_dataset["x"]))[:N]
         xsample = model.input_normalize(test_dataset["x"][random_index].to(device)).clone().requires_grad_(True)
 
-        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=True).mean(1).cpu().numpy()
+        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=False).mean(1).cpu().numpy()
 
     else:
         ValueError()
@@ -1108,5 +1112,9 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
             output_vars.append(k)
 
 
-    normalized_gradient  = hv.HeatMap((input_vars, output_vars, np.tanh(J)),["input","output"],["gradient"]).opts(colorbar= True, symmetric=True, cmap = "coolwarm", width = 1900, height = 1000, xrotation = 90, tools = ["hover"])
-    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh_train.html"))
+    normalized_gradient  = hv.HeatMap((input_vars, output_vars, np.tanh(J)),["input","output"],["gradient"])\
+            .opts(colorbar= True, symmetric=True, cmap = "coolwarm", width = 1900, height = 1000, xrotation = 90, tools = ["hover"])
+    
+    normalized_gradient = normalized_gradient.redim.range(gradient = (-1.,1.))
+
+    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh.html"))

@@ -1,11 +1,10 @@
-from asyncio.log import logger
 from collections import OrderedDict
 import warnings
 from pathlib import Path
 import sys
 import torch
 from gaia.models import TrainingModel
-from gaia.training import get_checkpoint_file
+from gaia.misc import get_checkpoint_file
 import os
 from gaia import get_logger
 import yaml
@@ -161,11 +160,25 @@ class ModelForExportSimple(torch.nn.Module):
         self.model = training_model.model
         self.debug = debug
 
+        if "positive_output_pattern" in training_model.hparams:
+            self.output_processor = training_model.output_processor
+        else:
+            self.output_processor = torch.nn.Identity()
+
+
+        if training_model.hparams.get("use_rel_hum_constraint",False):
+            logger.info("adding rel humidity constraint to moinsture tendencies")
+            self.use_rel_hum_constraint = True
+            self.rel_hum_constraint = training_model.rel_hum_constraint
+        else:
+            self.use_rel_hum_constraint = False
+            # self.rel_hum_constraint = torch.nn.Identity()
+
         if training_model.hparams.zero_outputs:
             zero_output = training_model.loss_output_weights[None,:] == 0
         else:
             output_dim = list(training_model.hparams.output_index.values())[-1][-1]
-            zero_output = torch.ones(output_dim, 1).bool()
+            zero_output = torch.zeros(output_dim, 1).bool()
 
         self.register_buffer("zero_output", zero_output)
 
@@ -183,6 +196,9 @@ class ModelForExportSimple(torch.nn.Module):
         x_norm = self.input_normalize(x)
 
         y = self.model(x_norm)
+        if self.use_rel_hum_constraint:
+            y = self.rel_hum_constraint(x_norm, y)
+        y = self.output_processor(y)
         y = self.output_normalize(y, normalize=False)
         y = y.masked_fill_(self.zero_output,0.)
 
@@ -208,11 +224,12 @@ def export(model_dir, export_name, inputs=None, outputs=None, debug = False, mod
         logger.info("assuming model has correct inputs and outputs, using simple export")
         model_for_export = ModelForExportSimple(model, debug=debug).eval().requires_grad_(False)
     else:
+        raise NotImplementedError
         model_for_export = ModelForExport(model, inputs, outputs, debug=debug).eval().requires_grad_(False)
 
     # TODO dont hard code this
     input_dim = list(model.hparams.input_index.values())[-1][-1]
-    example = torch.rand(10, input_dim)
+    example = torch.randn(10, input_dim)
     logger.info("running dummy example thru original model")
 
     out = model_for_export(example)

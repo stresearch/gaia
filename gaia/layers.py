@@ -1,8 +1,9 @@
-from turtle import forward
-from typing import OrderedDict
+from collections import OrderedDict
 import typing
 import torch
 from gaia import get_logger
+from torch.nn import functional as F
+
 
 logger = get_logger(__name__)
 
@@ -224,5 +225,37 @@ class FCLayer(torch.nn.Module):
 
         x = self.drop_out(x)
         x = self.relu(x)
+
+        return x
+    
+
+
+
+class OutputProcesser(torch.nn.Module):
+    def __init__(self, positive_output_mask, func = "exp"):
+        super().__init__()
+        if not isinstance(positive_output_mask, torch.Tensor):
+            positive_output_mask = torch.tensor(positive_output_mask).bool()
+        self.register_buffer("positive_output_mask",positive_output_mask.float())
+        self.func = func
+
+    def forward(self, x):
+        # x_exp = x.exp()
+        if self.func == "exp":
+            x_pos = x.exp()
+            x_pos = x_pos.masked_fill_(~self.positive_output_mask[None,:].bool(),0)
+
+        elif self.func == "softplus":
+            # x_pos = -F.logsigmoid(-x)
+            x_pos = F.softplus(x)
+            # x_pos = x_pos.masked_fill_(~self.positive_output_mask[None,:].bool(),0)
+
+        elif self.func == "rectifier":
+            x_pos = x.clip(min = 0)
+        else:
+            raise ValueError(f"unknown func {x_pos}")
+        
+        ## doing this way to support auto casting to fp16 and in case there any nans
+        x = x_pos * self.positive_output_mask + x * (1 - self.positive_output_mask)
 
         return x

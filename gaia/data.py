@@ -1,28 +1,25 @@
+import glob
+import hashlib
+import json
+import os
+import shutil
+from collections import OrderedDict, defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from math import prod
 from random import shuffle
-import shutil
 from typing import Union
-from collections import OrderedDict, defaultdict
-import torch
-from torch.utils.data import (
-    DataLoader,
-    TensorDataset,
-    random_split,
-    Dataset,
-    IterableDataset,
-)
-import boto3
-from torch.utils.data.sampler import BatchSampler, RandomSampler, SequentialSampler
-import glob
-from gaia import get_logger
-from netCDF4 import Dataset as netCDF4_Dataset
-from tqdm import auto as tqdm
-import numpy as np
-import os
-import json
-import hashlib
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
+import boto3
+import numpy as np
+import torch
+from netCDF4 import Dataset as netCDF4_Dataset
+from torch.utils.data import (DataLoader, Dataset, IterableDataset,
+                              TensorDataset, random_split)
+from torch.utils.data.sampler import (BatchSampler, RandomSampler,
+                                      SequentialSampler)
+from tqdm import auto as tqdm
+
+from gaia import get_logger
 from gaia.layers import InterpolateGrid1D
 
 logger = get_logger(__name__)
@@ -817,18 +814,28 @@ def get_dataset(
         if subsample_mode == "random":
             tensor_list = [t[::subsample, ...] for t in tensor_list]
             logger.info(f"subsampling by factor of {subsample}")
+
+        elif isinstance(subsample_mode, torch.Tensor):
+            logger.info(f"using index to subsample")
+            sample_index = subsample_mode
+            tensor_list = [t[sample_index, ...] for t in tensor_list]
+
         else:
             logger.info(f"using weighted subsample mode from file :{subsample_mode}")
             lat_lon_weights = torch.load(subsample_mode)
-            # sample_weights = lat_lon_weights[index[:,0], index[:,1]]
+            sample_weights = lat_lon_weights[index[:,0], index[:,1]]
             number_of_samples = tensor_list[0].shape[0]//subsample
-            lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
+            # lat_sample_index, lon_sample_index =  unravel_index(number_of_samples, shape = lat_lon_weights.shape)
 
-            lat_lon_sample_index = torch.multinomial(lat_lon_weights.ravel(), number_of_samples, replacement=True)
+            lat_lon_weights_sorted, sorted_index = sample_weights.ravel().sort(descending = True)
+            lat_lon_weights_sorted /= lat_lon_weights_sorted.sum()
+            lat_lon_weights_sorted_cumsum = lat_lon_weights_sorted.cumsum(0)
 
+            sample_index = torch.searchsorted(lat_lon_weights_sorted_cumsum, torch.rand(number_of_samples))
+            sample_index = sorted_index[sample_index]
 
+            dataset_dict["sample_index"] = sample_index
 
-            sample_index = torch.multinomial(sample_weights, number_of_samples, replacement=False)
             tensor_list = [t[sample_index, ...] for t in tensor_list]
 
             

@@ -1,9 +1,14 @@
+import os
 from collections import OrderedDict
 from math import ceil
-from typing import Optional
-from pytorch_lightning import LightningModule
+from typing import Optional, Union
+
 import torch
+import torch.nn.functional as F
+from pytorch_lightning import LightningModule
 from torch.nn import functional as F
+
+from gaia import get_logger
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (
     Conv2dDS,
@@ -12,14 +17,14 @@ from gaia.layers import (
     MultiIndexEmbedding,
     Normalization,
     NormalizationBN1D,
+    OutputProcesser,
     ResDNNLayer,
     make_interpolation_weights,
 )
-import os
-from gaia.unet.unet import UNet
-import torch.nn.functional as F
 from gaia.optim import get_cosine_schedule_with_warmup
-from gaia import get_logger
+from gaia.physics import RelHumConstraint
+from gaia.unet.unet import UNet
+from torch.nn.utils import clip_grad
 
 logger = get_logger(__name__)
 
@@ -38,13 +43,17 @@ class TrainingModel(LightningModule):
         loss_output_weights=None,
         predict_hidden_states=False,
         lr_schedule=None,
-        use_batch_norm_for_norm = False,
-        fine_tuning = False,
-        loss = "mse",
-        zero_outputs = True,
-        noise_sigma = 0,
-        unit_normalize = False,
-        weight_decay = 0,
+        use_batch_norm_for_norm=False,
+        fine_tuning=False,
+        loss="mse",
+        zero_outputs=True,
+        noise_sigma=0,
+        unit_normalize=False,
+        weight_decay=0,
+        positive_output_pattern=None,
+        positive_func="exp",
+        use_rel_hum_constraint=False,
+        use_rel_hum_reg = False,
         **kwargs,
     ):
         super().__init__()
@@ -90,8 +99,42 @@ class TrainingModel(LightningModule):
             # w *= w.shape[0] / w.sum()
             self.make_output_weights(loss_output_weights)
         else:
-            self.hparams.zero_output = False          
+            self.hparams.zero_outputs = False
 
+        if positive_output_pattern is not None:
+
+            def match(n):
+                return any(
+                    [n.startswith(p) for p in positive_output_pattern.split(",")]
+                )
+
+            # positive_output_mask = torch.cat([torch.ones(e-s).bool() if positive_output_pattern in k else torch.zeros(e-s).bool()  for k,(s,e) in output_index.items()])
+            positive_output_mask = torch.cat(
+                [
+                    torch.ones(e - s).bool() if match(k) else torch.zeros(e - s).bool()
+                    for k, (s, e) in output_index.items()
+                ]
+            )
+            logger.info(
+                f"adding {positive_output_mask.sum()} positive constraints to outputs"
+            )
+            self.output_processor = OutputProcesser(positive_output_mask, positive_func)
+        else:
+            self.output_processor = torch.nn.Identity()
+
+        if use_rel_hum_constraint:
+            logger.info("adding rel humidity constraint to moisture tend")
+            self.rel_hum_constraint = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize)
+
+
+        self.regs = []
+
+        if use_rel_hum_reg:
+            logger.info("adding rel humidity reg to moisture tend")
+            self.rel_hum_reg = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize, ub = 100, lb = 0)
+            self.regs.append("rel_hum")
+
+            
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
 
@@ -104,8 +147,12 @@ class TrainingModel(LightningModule):
     def setup_normalize(self, data_stats):
         if self.hparams.use_batch_norm_for_norm:
             logger.info("using batch norm for norm ...")
-            input_normalization = NormalizationBN1D(self.hparams.model_config["input_size"])
-            output_normalization = NormalizationBN1D(self.hparams.model_config["output_size"])
+            input_normalization = NormalizationBN1D(
+                self.hparams.model_config["input_size"]
+            )
+            output_normalization = NormalizationBN1D(
+                self.hparams.model_config["output_size"]
+            )
             return input_normalization, output_normalization
 
         if isinstance(data_stats, str) and os.path.exists(data_stats):
@@ -165,7 +212,7 @@ class TrainingModel(LightningModule):
                 stats["max"] - stats["mean"], stats["mean"] - stats["min"]
             )
 
-            std  =  stats["range"]
+            std = stats["range"]
 
             # stats["std_eff"] = torch.where(
             #     stats["std"] > thr, stats["std"], stats["range"]
@@ -187,8 +234,30 @@ class TrainingModel(LightningModule):
             optim = torch.optim.AdamW
         elif self.hparams.optimizer == "lamb":
             import torch_optimizer
+
             optim = torch_optimizer.Lamb
-        out["optimizer"] = optim(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+
+        if self.hparams.weight_decay > 0:
+            logger.info(
+                "setting l2 / weight decay regularization 0 for bias terms and batch norm scale"
+            )
+            params = [
+                {
+                    "params": p,
+                    "lr": self.hparams.lr,
+                    "weight_decay": self.hparams.weight_decay
+                    if len(p.shape) > 1
+                    else 0.0,
+                }
+                for p in self.parameters()
+            ]
+            out["optimizer"] = optim(params)
+        else:
+            out["optimizer"] = optim(
+                self.parameters(),
+                lr=self.hparams.lr,
+                weight_decay=self.hparams.weight_decay,
+            )
         if self.hparams.lr_schedule is not None:
             if self.hparams.lr_schedule == "cosine":
                 out["lr_scheduler"] = {
@@ -204,14 +273,26 @@ class TrainingModel(LightningModule):
 
         return out
 
+    # def configure_gradient_clipping(self, optimizer, optimizer_idx, gradient_clip_val: Optional[Union[int, float]] = None, gradient_clip_algorithm: Optional[str] = None):
+    #     for p in optimizer.param_groups:
+    #         clip_grad.clip_grad_norm_(p["params"], gradient_clip_val)
+
+
     def forward(self, x, index=None):
         if index is not None:
             y = self.model(x, index=index)
         else:
             y = self.model(x)
 
+
+        if self.hparams.use_rel_hum_constraint:
+            #TODO this needs to be fixed
+            y = self.rel_hum_constraint(x, y)
+
+        y = self.output_processor(y)
+
         if self.hparams.zero_outputs:
-            y = y.masked_fill_(self.loss_output_weights[None,:] == 0,0.)
+            y = y.masked_fill_(self.loss_output_weights[None, :] == 0, 0.0)
 
         return y
 
@@ -253,24 +334,28 @@ class TrainingModel(LightningModule):
             raise ValueError("wrong size of x")
 
         if self.training and (self.hparams.noise_sigma > 0):
-            
-            noise = torch.randn_like(x)*self.hparams.noise_sigma
+
+            noise = torch.randn_like(x) * self.hparams.noise_sigma
 
             if len(x.shape) == 4:
-                x1 = x[:,:1,:1,:1]
+                x1 = x[:, :1, :1, :1]
             elif len(x.shape) == 2:
-                x1 = x[:,:1]
+                x1 = x[:, :1]
             else:
                 raise ValueError("wrong size of x")
 
-            noise = noise.masked_fill(torch.rand_like(x1)>.5, 0.)
+            noise = noise.masked_fill(torch.rand_like(x1) > 0.5, 0.0)
             x = x + noise
 
         yhat = self(x, index=index)
 
         loss = OrderedDict()
 
-        losses_to_reduce  = []
+        losses_to_reduce = []
+
+        if self.hparams.use_rel_hum_reg:
+            losses_to_reduce.append("rel_hum")
+            loss["rel_hum"] = self.rel_hum_reg(x,yhat, mode = "as_regularization")
 
         if self.hparams.loss == "mse":
             mse = F.mse_loss(y, yhat, reduction="none")
@@ -279,7 +364,7 @@ class TrainingModel(LightningModule):
             loss["smooth_l1"] = F.smooth_l1_loss(yhat, y, reduction="none")
             with torch.no_grad():
                 mse = F.mse_loss(y, yhat, reduction="none")
-                
+
             losses_to_reduce.append("smooth_l1")
 
         else:
@@ -288,13 +373,10 @@ class TrainingModel(LightningModule):
         loss["mse"] = mse
         losses_to_reduce.append("mse")
 
-
         with torch.no_grad():
             eps = 1e-18
-            y_var = y.var(reduce_dims, unbiased=False).clip(min = eps)
-            skill = (
-                1.0 - mse.mean(reduce_dims) / y_var
-            ).clip(0, 1)
+            y_var = y.var(reduce_dims, unbiased=False).clip(min=eps)
+            skill = (1.0 - mse.mean(reduce_dims) / y_var).clip(0, 1)
 
             for k, v in self.hparams.output_index.items():
 
@@ -307,7 +389,6 @@ class TrainingModel(LightningModule):
                     for i, skill_vi in enumerate(skill_v):
                         loss_name = f"skill_ave_trunc_{k}_{i:02}"
                         loss[loss_name] = skill_vi
-
 
             if self.hparams.loss_output_weights is not None:
                 skill = skill * self.loss_output_weights
@@ -335,7 +416,13 @@ class TrainingModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.step(batch, "train")
-        return loss[self.hparams.loss]
+        out = loss[self.hparams.loss]
+
+        #adding reg terms
+        for r in self.regs:
+            out += loss[r]
+
+        return out
 
     def validation_step(self, batch, batch_idx, dataloader_idx=None):
         self.step(batch, "val")
@@ -365,7 +452,7 @@ class FcnBaseline(torch.nn.Module):
         output_size: int = 26 * 2,
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
-        use_index = False,
+        use_index=False,
         model_type=None,
     ):
         super().__init__()
@@ -373,9 +460,10 @@ class FcnBaseline(torch.nn.Module):
         if use_index:
             # add lon/lat as an additional input
             from gaia.plot import lats, lons
-            self.register_buffer("lats",torch.tensor(lats)/90.)
-            self.register_buffer("lons",torch.tensor(lons)/180.)
-            input_size = input_size+2
+
+            self.register_buffer("lats", torch.tensor(lats) / 90.0)
+            self.register_buffer("lons", torch.tensor(lons) / 180.0)
+            input_size = input_size + 2
 
         self.hidden_size = hidden_size
         self.input_size = input_size
@@ -384,7 +472,6 @@ class FcnBaseline(torch.nn.Module):
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
         self.model = self.make_model()
-        
 
     def make_model(self):
         if self.num_layers == 1:
@@ -408,19 +495,17 @@ class FcnBaseline(torch.nn.Module):
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
-    def forward(self, x, index : Optional[torch.Tensor] = None):
+    def forward(self, x, index: Optional[torch.Tensor] = None):
         if torch.jit.is_scripting():
             return self.model(x)
         else:
             if index is None:
                 return self.model(x)
             else:
-                lats = self.lats[index[:,0]]
-                lons = self.lons[index[:,1]]
-                x = torch.cat([x,lats[:,None], lons[:,None]],dim = 1)
+                lats = self.lats[index[:, 0]]
+                lons = self.lons[index[:, 1]]
+                x = torch.cat([x, lats[:, None], lons[:, None]], dim=1)
                 return self.model(x)
-
-
 
 
 class FcnWithIndex(torch.nn.Module):
@@ -448,9 +533,9 @@ class FcnWithIndex(torch.nn.Module):
 
     def make_model(self):
         if self.num_layers == 1:
-            return [FCLayer(
-                self.input_size, self.output_size, index_shape=self.index_shape
-            )]
+            return [
+                FCLayer(self.input_size, self.output_size, index_shape=self.index_shape)
+            ]
 
         input_layer = FCLayer(
             self.input_size,
@@ -478,9 +563,9 @@ class FcnWithIndex(torch.nn.Module):
         layers = [input_layer] + intermediate_layers + [output_layer]
         return layers
 
-    def forward(self, x, index = None):
+    def forward(self, x, index=None):
         for layer in self.layers:
-            x = layer(x,index = index)
+            x = layer(x, index=index)
         return x
 
 

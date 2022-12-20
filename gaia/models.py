@@ -11,6 +11,7 @@ from torch.nn import functional as F
 from gaia import get_logger
 from gaia.data import SCALING_FACTORS, flatten_tensor, unflatten_tensor
 from gaia.layers import (
+    BernoulliGammaOutput,
     Conv2dDS,
     FCLayer,
     InterpolateGrid1D,
@@ -21,6 +22,7 @@ from gaia.layers import (
     ResDNNLayer,
     make_interpolation_weights,
 )
+from gaia.loss import RelHumWeight
 from gaia.optim import get_cosine_schedule_with_warmup
 from gaia.physics import RelHumConstraint
 from gaia.unet.unet import UNet
@@ -54,6 +56,7 @@ class TrainingModel(LightningModule):
         positive_func="exp",
         use_rel_hum_constraint=False,
         use_rel_hum_reg = False,
+        use_sample_weights = False,
         **kwargs,
     ):
         super().__init__()
@@ -118,7 +121,10 @@ class TrainingModel(LightningModule):
             logger.info(
                 f"adding {positive_output_mask.sum()} positive constraints to outputs"
             )
-            self.output_processor = OutputProcesser(positive_output_mask, positive_func)
+            if positive_func == "gamma":
+                self.output_processor = BernoulliGammaOutput(positive_output_mask)
+            else:
+                self.output_processor = OutputProcesser(positive_output_mask, positive_func)
         else:
             self.output_processor = torch.nn.Identity()
 
@@ -133,6 +139,10 @@ class TrainingModel(LightningModule):
             logger.info("adding rel humidity reg to moisture tend")
             self.rel_hum_reg = RelHumConstraint(input_index, output_index, self.input_normalize, self.output_normalize, ub = 100, lb = 0)
             self.regs.append("rel_hum")
+
+        if use_sample_weights:
+            logger.info("using rel hum sample weights")
+            self.sample_weights_compute = RelHumWeight(input_index=input_index)
 
             
         if len(kwargs) > 0:
@@ -324,6 +334,10 @@ class TrainingModel(LightningModule):
         if self.fine_tuning:
             self.model.eval()
 
+
+        if self.hparams.use_sample_weights:
+            sample_weights = self.sample_weights_compute(batch[0])
+
         x, y, index = self.handle_batch(batch)
 
         if len(y.shape) == 2:
@@ -373,6 +387,10 @@ class TrainingModel(LightningModule):
         loss["mse"] = mse
         losses_to_reduce.append("mse")
 
+        if self.hparams.positive_func == "gamma": #compute log likelihood loss for the positive outputs
+            loss["gamma"] = self.output_processor.loss()
+            
+
         with torch.no_grad():
             eps = 1e-18
             y_var = y.var(reduce_dims, unbiased=False).clip(min=eps)
@@ -404,6 +422,18 @@ class TrainingModel(LightningModule):
                     loss[n] = loss[n] * self.loss_output_weights[None, :, None, None]
                 elif num_dims == 2:
                     loss[n] = loss[n] * self.loss_output_weights[None, :]
+                else:
+                    raise ValueError("wrong number of dims in mse")
+
+        if mode == "train" and self.hparams.use_sample_weights:
+
+            num_dims = len(mse.shape)
+
+            for n in losses_to_reduce:
+                if num_dims == 4:
+                    loss[n] = loss[n] * sample_weights[:, None, None, None]
+                elif num_dims == 2:
+                    loss[n] = loss[n] * sample_weights[:, None]
                 else:
                     raise ValueError("wrong number of dims in mse")
 
@@ -453,6 +483,7 @@ class FcnBaseline(torch.nn.Module):
         dropout: float = 0.01,
         leaky_relu: float = 0.15,
         use_index=False,
+        per_output_params = 1, #instead of predicting means, we predict prob density parameteters
         model_type=None,
     ):
         super().__init__()
@@ -471,6 +502,7 @@ class FcnBaseline(torch.nn.Module):
         self.dropout = dropout
         self.leaky_relu = leaky_relu
         self.num_layers = num_layers
+        self.per_output_params = per_output_params
         self.model = self.make_model()
 
     def make_model(self):
@@ -491,22 +523,30 @@ class FcnBaseline(torch.nn.Module):
             make_layer(self.hidden_size, self.hidden_size)
             for _ in range(self.num_layers - 2)
         ]
-        output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+        output_layer = torch.nn.Linear(self.hidden_size, self.output_size*self.per_output_params)
         layers = [input_layer] + intermediate_layers + [output_layer]
         return torch.nn.Sequential(*layers)
 
+    def reshape_output(self, y):
+        if self.per_output_params == 1:
+            return y
+        else:
+            return y.reshape(-1, self.output_size, self.per_output_params)
+
     def forward(self, x, index: Optional[torch.Tensor] = None):
+        
         if torch.jit.is_scripting():
-            return self.model(x)
+            y = self.model(x)
+            return self.reshape_output(y)
         else:
             if index is None:
-                return self.model(x)
+                y = self.model(x)
             else:
                 lats = self.lats[index[:, 0]]
                 lons = self.lons[index[:, 1]]
                 x = torch.cat([x, lats[:, None], lons[:, None]], dim=1)
-                return self.model(x)
-
+                y = self.model(x)
+            return self.reshape_output(y)
 
 class FcnWithIndex(torch.nn.Module):
     def __init__(

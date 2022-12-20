@@ -403,7 +403,7 @@ def main(
     return model_dir
 
 
-def get_dataset_from_model(model, split="test"):
+def get_dataset_from_model(model, split="test", chunk_size = 0):
 
     model_grid = model.hparams.get("model_grid", None)
     if model_grid is None:
@@ -415,7 +415,7 @@ def get_dataset_from_model(model, split="test"):
     dataset_params = model.hparams.dataset_params
 
     test_dataset, test_dataloader = get_dataset(
-        **dataset_params[split], model_grid=model_grid
+        **dataset_params[split], model_grid=model_grid, chunk_size = chunk_size
     )
 
     return test_dataset, test_dataloader

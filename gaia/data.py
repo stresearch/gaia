@@ -591,7 +591,8 @@ def get_dataset(
     data_grid = None,
     model_grid = None,
     subsample_mode = "random",
-    chunk_size = 0
+    chunk_size = 0,
+    variable_filter = None
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -737,6 +738,23 @@ def get_dataset(
             dataset_dict["stats"]["output_stats"][k] = output_interpolation(dataset_dict["stats"]["output_stats"][k])
 
         dataset_dict["output_index"] = output_interpolation.output_grid_index
+
+
+    if variable_filter is not None:
+        # example {"filter_type":"range", "range_values":(0,.5),"variable_name": "OCNFRAC"}
+        
+        logger.info(f"filtering with {variable_filter}")
+
+        if variable_filter["filter_type"] == "range":
+            temp_idx = dataset_dict["input_index"][variable_filter["variable_name"]][0]
+            s,e = variable_filter["range_values"]
+            mask = (dataset_dict["x"][:,temp_idx,...] >= s) & (dataset_dict["x"][:,temp_idx,...] < e)
+            logger.info(f"keeping {mask.float().mean()} of the data")
+            dataset_dict["x"] = dataset_dict["x"][mask,...]
+            dataset_dict["y"] = dataset_dict["y"][mask,...]
+        else:
+            raise ValueError(f"unknown filter {variable_filter}")
+
 
     tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 

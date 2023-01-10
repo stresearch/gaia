@@ -526,7 +526,7 @@ def plot_results(model_dir):
 def save_diagnostic_plot(
     model_dir,
     plot_types=["skill_vector", "skill_scalar", "skill_global", "correlation"],
-    dataset = None
+    dataset=None,
 ):
 
     import sys
@@ -597,9 +597,16 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            return hv.QuadMesh(
-                (lats, levels, temp), ["lats", "levels"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
+            return (
+                hv.QuadMesh(
+                    (lats, levels, temp),
+                    ["lats", "levels"],
+                    [f"{var}_mean"],
+                    label="mean",
+                )
+                .opts(symmetric=True, cmap="RdBu")
+                .opts(quad_mesh_opts)
+            )
 
         def plot_std(var, kind):
             s, e = output_index[var]
@@ -610,9 +617,16 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            return hv.QuadMesh(
-                (lats, levels, temp), ["lats", "levels"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
+            return (
+                hv.QuadMesh(
+                    (lats, levels, temp),
+                    ["lats", "levels"],
+                    [f"{var}_std"],
+                    label="std",
+                )
+                .opts(symmetric=False, cmap="Blues")
+                .opts(quad_mesh_opts)
+            )
 
         def plot_metrics(var, metric):
 
@@ -635,14 +649,19 @@ def save_diagnostic_plot(
                     hv.QuadMesh(
                         (lats, levels, skill), ["lats", "levels"], [f"{var}_skill"]
                     )
-                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f")
+                    .opts(symmetric=False, cmap="Greens")
+                    .opts(quad_mesh_opts)
+                    .opts(cformatter="%.2f")
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
-                    hv.QuadMesh((lats, levels, rmse), ["lats", "levels"], [f"{var}_rmse"])
+                    hv.QuadMesh(
+                        (lats, levels, rmse), ["lats", "levels"], [f"{var}_rmse"]
+                    )
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .opts(quad_mesh_opts)
                 )
 
         p_mean = hv.DynamicMap(plot_mean, kdims=["variable", "kind"]).redim.values(
@@ -679,9 +698,7 @@ def save_diagnostic_plot(
     if "skill_scalar" in plot_types:
         logger.info("generating plots of skill for scalar variables")
 
-        curve_opts = hv.opts.Curve(
-            width=400, height=300, tools=["hover"]
-        )
+        curve_opts = hv.opts.Curve(width=400, height=300, tools=["hover"])
 
         def plot_mean_scale(var, kind):
             s, e = output_index[var]
@@ -718,8 +735,8 @@ def save_diagnostic_plot(
 
             if kind == "skill":
                 return hv.Curve((lats, skill), ["lats"], [f"{var}_skill"])
-                #.redim.range(
-                    # **{f"{var}_skill": (0, 1)}
+                # .redim.range(
+                # **{f"{var}_skill": (0, 1)}
                 # )
             else:
                 return hv.Curve((lats, rmse), ["lats"], [f"{var}_rmse"])
@@ -782,44 +799,44 @@ def save_diagnostic_plot(
             mn = temp.values.mean()
             sd = temp.values.std()
 
-            temp["error_std"] =(temp.y - temp.yhat).abs()/sd
+            temp["error_std"] = (temp.y - temp.yhat).abs() / sd
 
-
-            temp = temp.sample(N, weights = "error_std")
-
+            temp = temp.sample(N, weights="error_std")
 
             # mask = ((temp-mn).abs() < 5 * sd).all(1)
             # temp_inliers = temp.loc[mask]
             # temp_inliers.loc[:,"kind"] = "inlier"
 
-                # mask_outliers = (temp.abs() >= ub).any(1)
-                # mask_outliers = ((temp-mn).abs() >= 5 * sd).any(1)
+            # mask_outliers = (temp.abs() >= ub).any(1)
+            # mask_outliers = ((temp-mn).abs() >= 5 * sd).any(1)
 
-               
-
-            rng = temp.loc[:,["y","yhat"]].abs().values.max()
+            rng = temp.loc[:, ["y", "yhat"]].abs().values.max()
 
             # mask_outliers = temp.diff(1).abs() >= sd
 
             if symmetric:
                 rng = (-rng, rng)
             else:
-                rng = (-rng* 1e-1, rng)
+                rng = (-rng * 1e-1, rng)
 
                 # temp_outliers = temp.loc[mask_outliers]
                 # if len(temp_outliers) > 0:
                 #     temp_outliers.loc[:,"kind"] = "outlier"
 
-
-
                 # temp = pd.concat([temp_inliers.sample(N), temp_outliers], ignore_index=True)
-
-
 
             return (
                 (
-                    hv.Points((temp.y, temp.yhat, temp.error_std), kdims = [f"y_{var}", f"yhat_{var}"], vdims = [f"error_std_{var}"]).opts(
-                        width=400, height=400, padding=0.05, color = f"error_std_{var}", colorbar=True
+                    hv.Points(
+                        (temp.y, temp.yhat, temp.error_std),
+                        kdims=[f"y_{var}", f"yhat_{var}"],
+                        vdims=[f"error_std_{var}"],
+                    ).opts(
+                        width=400,
+                        height=400,
+                        padding=0.05,
+                        color=f"error_std_{var}",
+                        colorbar=True,
                     )
                     * hv.Curve((rng, rng)).opts(
                         line_width=1, color="orange", title=f"corr: {c:.3f}"
@@ -883,9 +900,13 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            return hv.QuadMesh(
-                (lons, lats, temp), ["lons", "lats"], [f"{var}_mean"], label="mean"
-            ).opts(symmetric=True, cmap="RdBu").opts(quad_mesh_opts)
+            return (
+                hv.QuadMesh(
+                    (lons, lats, temp), ["lons", "lats"], [f"{var}_mean"], label="mean"
+                )
+                .opts(symmetric=True, cmap="RdBu")
+                .opts(quad_mesh_opts)
+            )
 
         def plot_std(var, kind):
 
@@ -906,9 +927,13 @@ def save_diagnostic_plot(
 
             # find robust range
 
-            return hv.QuadMesh(
-                (lons, lats, temp), ["lons", "lats"], [f"{var}_std"], label="std"
-            ).opts(symmetric=False, cmap="Blues").opts(quad_mesh_opts)
+            return (
+                hv.QuadMesh(
+                    (lons, lats, temp), ["lons", "lats"], [f"{var}_std"], label="std"
+                )
+                .opts(symmetric=False, cmap="Blues")
+                .opts(quad_mesh_opts)
+            )
 
         def plot_metrics(var, metric):
 
@@ -937,14 +962,19 @@ def save_diagnostic_plot(
             if metric == "skill":
                 return (
                     hv.QuadMesh((lons, lats, skill), ["lons", "lats"], [f"{var}_skill"])
-                    .opts(symmetric=False, cmap="Greens").opts(quad_mesh_opts).opts(cformatter="%.2f",)
+                    .opts(symmetric=False, cmap="Greens")
+                    .opts(quad_mesh_opts)
+                    .opts(
+                        cformatter="%.2f",
+                    )
                     # .redim.range(**{f"{var}_skill": (0, 1)})
                 )
             else:
                 return (
                     hv.QuadMesh((lons, lats, rmse), ["lons", "lats"], [f"{var}_rmse"])
                     .opts(symmetric=False, cmap="Oranges", logz=False)
-                    .redim.range(**{f"{var}_rmse": (0, rmse_max)}).opts(quad_mesh_opts)
+                    .redim.range(**{f"{var}_rmse": (0, rmse_max)})
+                    .opts(quad_mesh_opts)
                 )
 
         for var in tqdm.tqdm(vector_output_variables):  # = 'PTTEND'
@@ -977,7 +1007,7 @@ def save_diagnostic_plot(
                 hv.save(
                     combined.select(variable=v),
                     plots_path / f"stats_and_metrics_global_{v}.html",
-                    title = f"States and Metrics Global: {v}",
+                    title=f"States and Metrics Global: {v}",
                 )
 
             # p_pane_vector_valued = pn.pane.HoloViews(combined, widget_location="top")
@@ -1016,8 +1046,7 @@ def save_diagnostic_plot(
             hv.save(
                 combined.select(variable=v),
                 plots_path / f"stats_and_metrics_global_{v}.html",
-                title = f"States and Metrics Global: {v}",
-
+                title=f"States and Metrics Global: {v}",
             )
 
         # p_pane_vector_valued = pn.pane.HoloViews(combined, widget_location="top")
@@ -1030,12 +1059,13 @@ def save_diagnostic_plot(
         # )
 
 
-def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
+def save_gradient_plots(model_dir, device="cpu", kind="normalized"):
     import sys
+
     # sys.path.append("../../gaia-surrogate")
     # from gaia.training import main
     from gaia.config import Config, levels
-    from gaia.plot import lats,lons
+    from gaia.plot import lats, lons
     from gaia.export import export
     from math import log
     import numpy as np
@@ -1045,11 +1075,18 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
     from gaia.models import TrainingModel
     from gaia.training import get_dataset_from_model, get_checkpoint_file
     import holoviews as hv
-    hv.extension("bokeh")   
 
+    hv.extension("bokeh")
 
     # model_dir = "/proj/gaia-climate/team/kirill/gaia-surrogate/lightning_logs_integraion_fixed/version_2_100_no_TS"
-    model  = TrainingModel.load_from_checkpoint(get_checkpoint_file(model_dir), map_location="cpu").eval().requires_grad_(False).to(device)
+    model = (
+        TrainingModel.load_from_checkpoint(
+            get_checkpoint_file(model_dir), map_location="cpu"
+        )
+        .eval()
+        .requires_grad_(False)
+        .to(device)
+    )
 
     # model.hparams.use_rel_hum_constraint = False
 
@@ -1057,64 +1094,269 @@ def save_gradient_plots(model_dir, device = "cpu", kind = "normalized"):
         xnorm = model.input_normalize(x)
         # ynorm = model.model(xnorm)
         ynorm = model(xnorm)
-        return model.output_normalize(ynorm,normalize = False).sum(0)
+        return model.output_normalize(ynorm, normalize=False).sum(0)
 
     def func_norm(x):
         # return model.model(x).sum(0)
         return model(x).sum(0)
 
-
-    test_dataset, test_dataloader = get_dataset_from_model(model, split = "test")
+    test_dataset, test_dataloader = get_dataset_from_model(model, split="test")
 
     N = 10000
 
     if kind == "unnormalized":
-        random_index =torch.randperm(len(test_dataset["x"]))[:N]
-        xsample = model.input_normalize(torch.randn_like(test_dataset["x"][:N]).to(device),normalize = False).clone().requires_grad_(True)
+        random_index = torch.randperm(len(test_dataset["x"]))[:N]
+        xsample = (
+            model.input_normalize(
+                torch.randn_like(test_dataset["x"][:N]).to(device), normalize=False
+            )
+            .clone()
+            .requires_grad_(True)
+        )
         xsample = test_dataset["x"][:N].clone().to(device).requires_grad_(True)
-        J = torch.autograd.functional.jacobian(func, xsample, vectorize=True).mean(1).cpu().numpy()
+        J = (
+            torch.autograd.functional.jacobian(func, xsample, vectorize=True)
+            .mean(1)
+            .cpu()
+            .numpy()
+        )
 
     elif kind == "normalized":
         N = 10000
-        random_index =torch.randperm(len(test_dataset["x"]))[:N]
-        xsample = model.input_normalize(test_dataset["x"][random_index].to(device)).clone().requires_grad_(True)
+        random_index = torch.randperm(len(test_dataset["x"]))[:N]
+        xsample = (
+            model.input_normalize(test_dataset["x"][random_index].to(device))
+            .clone()
+            .requires_grad_(True)
+        )
 
-        J = torch.autograd.functional.jacobian(func_norm, xsample, vectorize=False).mean(1).cpu().numpy()
+        J = (
+            torch.autograd.functional.jacobian(func_norm, xsample, vectorize=False)
+            .mean(1)
+            .cpu()
+            .numpy()
+        )
 
     else:
         ValueError()
 
-
     input_vars = []
-    for k,(s,e) in model.hparams.input_index.items():
+    for k, (s, e) in model.hparams.input_index.items():
         k = k.split("_")
         if len(k) > 1:
             k = k[-1]
         else:
             k = k[0]
-        if e-s>1:
-            for i in range(e-s):
+        if e - s > 1:
+            for i in range(e - s):
                 input_vars.append(f"{k}{i:02}")
         else:
             input_vars.append(k)
-            
+
     output_vars = []
-    for k,(s,e) in model.hparams.output_index.items():
+    for k, (s, e) in model.hparams.output_index.items():
         k = k.split("_")
         if len(k) > 1:
             k = k[-1]
         else:
             k = k[0]
-        if e-s>1:
-            for i in range(e-s):
+        if e - s > 1:
+            for i in range(e - s):
                 output_vars.append(f"{k}{i:02}")
         else:
             output_vars.append(k)
 
+    normalized_gradient = hv.HeatMap(
+        (input_vars, output_vars, np.tanh(J)), ["input", "output"], ["gradient"]
+    ).opts(
+        colorbar=True,
+        symmetric=True,
+        cmap="coolwarm",
+        width=1900,
+        height=1000,
+        xrotation=90,
+        tools=["hover"],
+    )
 
-    normalized_gradient  = hv.HeatMap((input_vars, output_vars, np.tanh(J)),["input","output"],["gradient"])\
-            .opts(colorbar= True, symmetric=True, cmap = "coolwarm", width = 1900, height = 1000, xrotation = 90, tools = ["hover"])
-    
-    normalized_gradient = normalized_gradient.redim.range(gradient = (-1.,1.))
+    normalized_gradient = normalized_gradient.redim.range(gradient=(-1.0, 1.0))
 
     hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh.html"))
+
+
+def save_rel_hum_plots(
+    model_dir,
+    device="cpu",
+    seed=345,
+    max_lat=20,
+    file="/proj/gaia-climate/data/cam4_v3/rF_AMIP_CN_CAM4--torch-test.cam2.h1.1979-01-01-00000.nc",
+    ocean_frac_val = None
+):
+    import pytorch_lightning as pl
+
+    pl.seed_everything(seed)
+
+    from gaia.training import main, get_dataset_from_model, get_checkpoint_file
+    from gaia.config import Config, levels
+    from gaia.plot import lats, lons
+    from gaia.models import TrainingModel
+    from gaia.data import (
+        get_dataset,
+        unflatten_tensor,
+        flatten_tensor,
+        FastTensorDataset,
+    )
+    from gaia.misc import weighted_sample
+    from math import log
+    import numpy as np
+    import torch
+    from torch.utils.data import (
+        DataLoader,
+        Dataset,
+        IterableDataset,
+        TensorDataset,
+        random_split,
+    )
+
+    from sklearn.cluster import MiniBatchKMeans
+
+    import tqdm.auto as tqdm
+
+    from gaia.physics import HumidityConversion
+
+    model = TrainingModel.load_from_checkpoint(
+        get_checkpoint_file(model_dir), map_location=device
+    ).eval().to(device).requires_grad_(False)
+
+    model_seed = model.hparams.get("seed", 0)
+
+    test_dataset, test_loader = get_dataset_from_model(model)
+
+    lats_mask = torch.tensor(lats).abs() <= max_lat
+
+    x_r = unflatten_tensor(test_dataset["x"])[:, :, lats_mask, :]
+    y_r = unflatten_tensor(test_dataset["y"])[:, :, lats_mask, :]
+
+
+    num_samples = 10000
+    sample_idx = [torch.randint(n, (num_samples,)) for n in x_r.shape]
+    x_r_sample = x_r[sample_idx[0], :, sample_idx[2], sample_idx[3]]
+    y_r_sample = y_r[sample_idx[0], :, sample_idx[2], sample_idx[3]]
+
+    if ocean_frac_val is not None:
+
+        ocean_frac = x_r_sample[:,model.hparams.input_index["OCNFRAC"][0]]
+        ocean_frac_mask = ocean_frac == ocean_frac_val
+        logger.info(f"filtering to grids with OCNFRAC = {ocean_frac_val}, keeping {ocean_frac_mask.float().mean()} percent of the data")
+
+        x_r_sample = x_r_sample[ocean_frac_mask]
+        y_r_sample = y_r_sample[ocean_frac_mask]
+
+    hum_conversion = HumidityConversion.from_nc_file(file=file)
+
+    var_names = ["B_Q", "B_T", "B_PS"]
+    x_r_sample_dict = dict()
+
+    for v in var_names:
+        x_r_sample_dict[v] = x_r_sample[
+            :, model.hparams.input_index[v][0] : model.hparams.input_index[v][1]
+        ]
+
+    rel_hum_0 = hum_conversion(
+        x_r_sample_dict["B_Q"],
+        x_r_sample_dict["B_T"],
+        x_r_sample_dict["B_PS"],
+        mode="spec2rel",
+    )
+
+    rel_hum_range = torch.linspace(0, 120, 50).float()
+    new_q_range = torch.cat(
+        [
+            hum_conversion(
+                r * torch.ones_like(x_r_sample_dict["B_Q"]),
+                x_r_sample_dict["B_T"],
+                x_r_sample_dict["B_PS"],
+                mode="rel2spec",
+            )[..., None]
+            for r in rel_hum_range
+        ],
+        dim=-1,
+    )
+
+    rh = rel_hum_range.numpy()
+    lvls = np.array(levels["cam4"]).astype(float)
+
+    B_Q_si = model.hparams.input_index["B_Q"][0]
+    B_Q_ei = model.hparams.input_index["B_Q"][1]
+
+    PTEQ_si = model.hparams.output_index["A_PTEQ"][0]
+    PTEQ_ei = model.hparams.output_index["A_PTEQ"][1]
+
+    level_index_list = list(range(8, 26))[::-1]
+    level_nn = 0
+
+    # denormalize
+
+    outs_per_level = dict()
+
+    with torch.no_grad():
+
+        for level_index in level_index_list:
+
+            outs = []
+
+            for i in tqdm.trange(new_q_range.shape[-1]):
+                x_temp = x_r_sample.clone()
+                x_temp[:, B_Q_si + level_index] = new_q_range[:, level_index, i]
+                y_hat = model.predict_step([x_temp.to(device), y_r_sample.to(device)], None)
+                y_hat = model.output_normalize(y_hat.to(device)).cpu()
+                outs.append(y_hat[:, PTEQ_si:PTEQ_ei][:, :, None])
+
+            outs = torch.cat(outs, dim=-1)
+
+            outs_per_level[level_index] = outs
+
+    def plot_sample_mean(target_l, l):
+        # l = levels["cam4"].index(l)
+
+        outs = outs_per_level[target_l]
+        mn = outs.mean(0)
+        std = outs.std(0)
+
+        color = "lightblue" if l != target_l else "blue"
+
+        mean_plot = hv.Curve(
+            (rh, mn[l, :]),
+            ["rel_hum"],
+            [f"dq_normalized_{target_l}"],
+            label="adjacent" if l != target_l else "probe",
+        ).opts(width=300, color=color, alpha=1, line_width=2, show_grid=True)
+        # err_plot = hv.Spread((rh, mn[l,:], std[l,:]),["rel_hum"],[f"dq_{l}",f"dq_err_{l}"]).opts(alpha = .5, line_width = .5)
+        # return err_plot*mean_plot
+        return mean_plot * hv.Text(
+            rh[-1] + 3,
+            mn[l, -1].item(),
+            f"level: {levels['cam4'][l]:.0f} [{l}]",
+            halign="left",
+        )
+
+    plot = hv.Layout(
+        [
+            hv.Overlay(
+                [
+                    plot_sample_mean(target_l, l)
+                    for l in range(max(0, target_l - 2), min(target_l + 3, 26))
+                ]
+            ).opts(
+                show_legend=True,
+                legend_position="bottom_left",
+                title=f'probe level {levels["cam4"][target_l]:.0f} [{target_l}]',
+            )
+            for target_l in level_index_list
+        ]
+    )
+
+    plot = plot.opts(title=f"single level probing seed {model_seed}, |lats| <= {max_lat}, OCEANFRAC == {ocean_frac_val}").cols(6)
+
+    save_file = os.path.join(model_dir,f"single_level_rel_hum_probe_{max_lat}_{ocean_frac_val}.html")
+
+    hv.save(plot, save_file)

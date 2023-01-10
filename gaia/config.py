@@ -205,6 +205,7 @@ class Config():
         outputs = cli_args.get('dataset_params',{}).get("outputs",None)
         data_grid = cli_args.get('dataset_params',{}).get("data_grid",data_grid)
         subsample_mode = cli_args.get('dataset_params',{}).get("subsample_mode", "random")
+        variable_filter = cli_args.get('dataset_params',{}).get("variable_filter", None)
         
         dataset_params = dict(
             train=dict(
@@ -219,7 +220,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode, 
+                variable_filter = variable_filter
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
@@ -233,7 +235,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode,
+                variable_filter = variable_filter
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
@@ -247,7 +250,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode,
+                variable_filter = variable_filter
             ),
             mean_thres=mean_thres,
             dataset = dataset

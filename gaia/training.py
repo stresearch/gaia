@@ -403,19 +403,32 @@ def main(
     return model_dir
 
 
-def get_dataset_from_model(model, split="test"):
+def get_dataset_from_model(model, dataset= None, split="test", chunk_size = 0):
+
+    if dataset is None:
+        
+        dataset_params = model.hparams.dataset_params
+        dataset = model.hparams.dataset_params["dataset"]
+        logger.info(f"using default datast {dataset} for the model")
+    else:
+        config = Config(
+        {
+            "dataset_params": {
+                "dataset": dataset,
+            },
+        }
+        )
+        dataset_params = config.config["dataset_params"]
 
     model_grid = model.hparams.get("model_grid", None)
+
     if model_grid is None:
         logger.info("model grid is not found... trying to infer from dataset")
-        dataset = model.hparams.dataset_params.get("dataset", None)
         if dataset:
             model_grid = get_levels(dataset)
 
-    dataset_params = model.hparams.dataset_params
-
-    test_dataset, test_dataloader = get_dataset(
-        **dataset_params[split], model_grid=model_grid
+    split_dataset, split_dataloader = get_dataset(
+        **dataset_params[split], model_grid=model_grid, chunk_size = chunk_size
     )
 
-    return test_dataset, test_dataloader
+    return split_dataset, split_dataloader

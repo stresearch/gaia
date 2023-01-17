@@ -259,3 +259,67 @@ class OutputProcesser(torch.nn.Module):
         x = x_pos * self.positive_output_mask + x * (1 - self.positive_output_mask)
 
         return x
+
+
+class BernoulliGammaOutput(torch.nn.Module):
+    def __init__(self, positive_output_mask, eps = 1e-9):
+        super().__init__()
+    
+        if not isinstance(positive_output_mask, torch.Tensor):
+            positive_output_mask = torch.tensor(positive_output_mask).bool()
+        self.register_buffer("output_mask",positive_output_mask.float())
+        self.eps = eps
+
+
+    def mean(self, ins, threshold = True):
+        p = torch.sigmoid(ins[:,:,0])
+        alpha_div_beta = torch.exp(ins[:,:,1] - ins[:,:,2])
+        out = p*alpha_div_beta
+
+        if threshold:
+            out = out.masked_fill(p<self.eps, 0)
+
+        return out
+
+    def log_likelihood(self,y,ins):
+        p = (y>self.eps).float()
+        log_phat = ins[:,:,0]
+
+        # log_y = torch.log(y + self.eps)
+
+        # part of ll corresponding to bernoulli 
+        bce_term = F.binary_cross_entropy_with_logits(log_phat, p, reduction="none")
+
+        # part of ll corresponding to gamma (parametrized in terms of shape and rate)
+
+        log_alpha = ins[:,:,1]
+        log_beta = ins[:,:,2]
+        phat = torch.sigmoid(ins[:,:,0])
+
+        alpha = log_alpha.exp()
+        beta = log_beta.exp()
+
+        gamma_term = (alpha-1) * (y + self.eps).log() + alpha * log_beta - torch.lgamma(alpha + self.eps)
+        gamma_term = phat*gamma_term - y*beta
+
+        return bce_term - gamma_term # need to maximize log likelihood
+
+    def forward(self, x):
+        out = x[:,:,0]
+        out[:,self.output_mask] = self.mean(x[:,self.output_mask,:]) # only worry about pos output variables
+        return out
+
+    def get_loss(self, ytrue, y):
+        pass
+
+
+
+
+
+
+
+    
+
+        
+
+    

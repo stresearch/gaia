@@ -3,3 +3,12 @@ pytorch-lightning
 holoviews
 bokeh
 omegaconf
+netCDF4
+mergedeep
+xarray
+metpy
+boto3
+imageio_ffmpeg
+Pillow
+plotly
+pandas

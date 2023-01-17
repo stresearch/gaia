@@ -120,7 +120,7 @@ class Config():
         )
         self.config = merge(config, cli_args)
 
-        # logger.info(f"Config: \n{self}")
+        logger.info(f"Config: \n{self}")
 
 
     def __repr__(self) -> str:
@@ -162,7 +162,10 @@ class Config():
         base = cli_args.get('dataset_params',{}).get("prefix",None)
 
         
-        cam4_toy_data = os.environ.get("GAIA_TOY_DATA", "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload")
+
+        # cam4_toy_data = os.environ.get("GAIA_CAM4_TOY", "/ssddg1/gaia/cam4_v5/cam4-famip-30m-timestep-third-upload")
+
+        
 
         if base is None:
             dataset_paths = {
@@ -176,9 +179,16 @@ class Config():
                 "spcam_fixed": "/ssddg1/gaia/fixed/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4",
-                "cam4_toy" : cam4_toy_data,
                 "cam4_upload4_v1": "/ssddg1/gaia/cam4_upload4_v1/cam4-famip-30m-timestep-with-b_relhum-4rth-upload",
             }
+
+            for k,v in os.environ.items():
+                if k.startswith("GAIA"):
+                    temp  = k.replace("GAIA_","").lower()
+                    if "cam4" not in temp or "spcam" not in temp:
+                        logger.warning(f"climate model name (cam4 or spcam) needs to be part of the dataset name... skipping {temp}")
+                    dataset_paths[temp] = v
+                    logger.info(f"adding custom dataset name->path prefix: {temp}->{v}")
 
             dataset = cli_args.get('dataset_params',{}).get('dataset', None)
             base = dataset_paths[dataset]
@@ -205,6 +215,7 @@ class Config():
         outputs = cli_args.get('dataset_params',{}).get("outputs",None)
         data_grid = cli_args.get('dataset_params',{}).get("data_grid",data_grid)
         subsample_mode = cli_args.get('dataset_params',{}).get("subsample_mode", "random")
+        variable_filter = cli_args.get('dataset_params',{}).get("variable_filter", None)
         
         dataset_params = dict(
             train=dict(
@@ -219,7 +230,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode, 
+                variable_filter = variable_filter
             ),
             val=dict(
                 dataset_file=base + "_val.pt",
@@ -233,7 +245,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode,
+                variable_filter = variable_filter
             ),
             test=dict(
                 dataset_file=base+'_test.pt',
@@ -247,7 +260,8 @@ class Config():
                 inputs = inputs,
                 outputs = outputs,
                 data_grid = data_grid,
-                subsample_mode = subsample_mode
+                subsample_mode = subsample_mode,
+                variable_filter = variable_filter
             ),
             mean_thres=mean_thres,
             dataset = dataset

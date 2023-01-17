@@ -590,7 +590,9 @@ def get_dataset(
     outputs=None,
     data_grid = None,
     model_grid = None,
-    subsample_mode = "random"
+    subsample_mode = "random",
+    chunk_size = 0,
+    variable_filter = None
 ):
 
     dataset_dict = torch.load(dataset_file)
@@ -737,6 +739,23 @@ def get_dataset(
 
         dataset_dict["output_index"] = output_interpolation.output_grid_index
 
+
+    if variable_filter is not None:
+        # example {"filter_type":"range", "range_values":(0,.5),"variable_name": "OCNFRAC"}
+        
+        logger.info(f"filtering with {variable_filter}")
+
+        if variable_filter["filter_type"] == "range":
+            temp_idx = dataset_dict["input_index"][variable_filter["variable_name"]][0]
+            s,e = variable_filter["range_values"]
+            mask = (dataset_dict["x"][:,temp_idx,...] >= s) & (dataset_dict["x"][:,temp_idx,...] < e)
+            logger.info(f"keeping {mask.float().mean()} of the data")
+            dataset_dict["x"] = dataset_dict["x"][mask,...]
+            dataset_dict["y"] = dataset_dict["y"][mask,...]
+        else:
+            raise ValueError(f"unknown filter {variable_filter}")
+
+
     tensor_list = [dataset_dict["x"], dataset_dict["y"]]
 
     if include_index or (space_filter is not None) or subsample_mode != "random":
@@ -844,7 +863,7 @@ def get_dataset(
     logger.info(f"data size {len(tensor_list[0])}")
 
     data_loader = DataLoader(
-        FastTensorDataset(*tensor_list, batch_size=batch_size, shuffle=shuffle),
+        FastTensorDataset(*tensor_list, batch_size=batch_size, shuffle=shuffle, chunk_size = chunk_size if shuffle else 0),
         batch_size=None,
         pin_memory=True,
     )
@@ -860,7 +879,7 @@ class FastTensorDataset(IterableDataset):
     Source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
     """
 
-    def __init__(self, *tensors, batch_size=32, shuffle=False):
+    def __init__(self, *tensors, batch_size=32, shuffle=False, chunk_size = 0):
         """
         Initialize a FastTensorDataLoader.
         :param *tensors: tensors to store. Must have the same length @ dim 0.
@@ -872,6 +891,26 @@ class FastTensorDataset(IterableDataset):
         assert all(t.shape[0] == tensors[0].shape[0] for t in tensors)
         self.tensors = tensors
 
+        self.chunk_size = chunk_size
+
+
+        if self.chunk_size > 0:
+            self.slice_size = batch_size // self.chunk_size
+            self.slice_size += (self.slice_size // 10)
+            logger.info(f"using pseudo random shuffing with chunksize = {self.slice_size}")
+            slice_index = torch.arange(0,tensors[0].shape[0], self.slice_size).long()
+            self.slices = [[t[s:s+self.slice_size] for s in slice_index] for t in self.tensors]
+
+            self.num_slices = len(self.slices[0])
+            # self.slices = torch.empty(self.num_slices,2).long()
+            # self.slices[:,0] =  slices
+            # self.slices[:-1,1] = slices[1:]
+            # self.slices[-1,1] = tensors[0].shape[0]
+            # self.slice_size = slice_size
+        else:
+            self.slice_size = 1
+
+ 
         self.dataset_len = self.tensors[0].shape[0]
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -882,10 +921,21 @@ class FastTensorDataset(IterableDataset):
             n_batches += 1
         self.n_batches = n_batches
 
-    def __iter__(self):
-        if self.shuffle:
+
+    def shuffle_tensors(self):
+        if self.chunk_size  == 0:
             r = torch.randperm(self.dataset_len)
             self.tensors = [t[r] for t in self.tensors]
+        else:
+            slice_order = torch.randperm(self.num_slices)
+            self.tensors = [torch.cat([s[i] for i in slice_order]) for s in self.slices]
+
+    # def shuffle_chunks_per_tensor(self, t, chunk_order):
+    #     return torch.cat([t[s:e] for s,e in self.slices[chunk_order,:]])
+
+    def __iter__(self):
+        if self.shuffle:
+            self.shuffle_tensors()
         self.i = 0
         return self
 

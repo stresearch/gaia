@@ -22,7 +22,7 @@ from gaia.layers import (
     ResDNNLayer,
     make_interpolation_weights,
 )
-from gaia.loss import RelHumWeight
+from gaia.loss import LinearConstraintResidual, RelHumWeight
 from gaia.optim import get_cosine_schedule_with_warmup
 from gaia.physics import HumidityConversionWithIndex, RelHumConstraint
 from gaia.unet.unet import UNet
@@ -58,6 +58,7 @@ class TrainingModel(LightningModule):
         use_rel_hum_reg=False,
         use_sample_weights=False,
         use_pteq_gradient_reg=0,
+        linear_constraints = None,
         **kwargs,
     ):
         super().__init__()
@@ -165,6 +166,19 @@ class TrainingModel(LightningModule):
                 file="/proj/gaia-climate/data/cam4_v3/rF_AMIP_CN_CAM4--torch-test.cam2.h1.1979-01-01-00000.nc",
             )
             self.regs.append("pteq_grad")
+
+
+        if linear_constraints is not None:
+            self.linear_constraints_residuals = torch.nn.ModuleDict() 
+
+            for con in linear_constraints.split(";"): #seperate multiple constaints with ;
+                logger.info(f"adding linear constraint {con}")
+                ins,outs = con.split(":") # seperate ins and outs with :
+                ints = ints.split(",") if len(ins) > 0 else None
+                outs = outs.split(",") if len(outs) > 0 else None
+                self.linear_constraints_residuals[f"lin_con_{con}"] = LinearConstraintResidual(input_index= input_index, output_index= output_index, input_signs_and_names= ins, output_signs_and_names= outs)
+                self.regs.append(f"lin_con_{con}")
+
 
         if len(kwargs) > 0:
             logger.warning(f"unkown kwargs {list(kwargs.keys())}")
@@ -441,6 +455,23 @@ class TrainingModel(LightningModule):
             self.hparams.positive_func == "gamma"
         ):  # compute log likelihood loss for the positive outputs
             loss["gamma"] = self.output_processor.loss()
+
+
+        if self.hparams.get("linear_constraints",None):
+
+            yhat_unnorm = self.output_normalize(yhat, normalize = False)
+            for k, constraint in self.linear_constraints_residuals.items():
+                #downweigh them by sum of variances
+                weight = 0.
+                if constraint.apply_to_input:
+                    weight += self.input_normalize.std[:, constraint.input_mask,...].square().sum()
+
+                if constraint.apply_to_output:
+                    weight += self.output_normalize.std[:, constraint.output_mask,...].square().sum()
+                
+                loss[k] = constraint(batch[0], yhat_unnorm).mean() / weight
+
+
 
         with torch.no_grad():
             eps = 1e-18

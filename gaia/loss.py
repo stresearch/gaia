@@ -65,7 +65,7 @@ class LinearConstraintResidual(torch.nn.Module):
         super().__init__()
 
         def make_signs_and_masks(index, signs_and_names):
-            input_length = list(input_index.values())[-1][-1]
+            input_length = list(index.values())[-1][-1]
             mask = torch.zeros(input_length)
             sign = torch.ones(input_length)
 
@@ -76,22 +76,29 @@ class LinearConstraintResidual(torch.nn.Module):
                 mask[s:e] = 1
                 sign[s:e] = sg
 
-            return sign, mask
+            return sign, mask.bool()
 
-        self.apply_to_input = True
+        self.size = 0
+
+        self.apply_to_input = False
 
         if input_signs_and_names is not None:
             sign,mask = make_signs_and_masks(input_index,input_signs_and_names )
             self.register_buffer("input_sign", sign)
             self.register_buffer("input_mask", mask)
             self.apply_to_input = True
+            self.size += len(input_signs_and_names)
 
-        self.apply_to_output = True
+        self.apply_to_output = False
 
         if output_signs_and_names is not None:
             sign,mask = make_signs_and_masks(output_index,output_signs_and_names )
             self.register_buffer("output_sign", sign)
             self.register_buffer("output_mask", mask)
+            self.apply_to_output = True
+            self.size += len(output_signs_and_names)
+
+        
 
 
     def forward(self, x_unnorm, y_unnorm):
@@ -100,18 +107,17 @@ class LinearConstraintResidual(torch.nn.Module):
 
         if self.apply_to_input:
 
-            x_sum = x_unnorm * self.inpint_sign[None,:]
-            x_sum = x_sum[:,self.input_mask].sum(-1)
+            x_sum = x_unnorm * self.input_sign[None,:]
+            x_sum = x_sum[:,self.input_mask].sum(1)
 
             sm += x_sum
 
         if self.apply_to_output:
 
             y_sum = y_unnorm * self.output_sign[None, :]
-            sm += y_sum[:,self.output_mask].sum(-1)
+            sm += y_sum[:,self.output_mask].sum(1)
 
-
-        return sm
+        return sm.square()/self.size
 
 
 

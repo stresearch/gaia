@@ -232,12 +232,13 @@ class FCLayer(torch.nn.Module):
 
 
 class OutputProcesser(torch.nn.Module):
-    def __init__(self, positive_output_mask, func = "exp"):
+    def __init__(self, positive_output_mask, func = "exp", use_stop_grad = True):
         super().__init__()
         if not isinstance(positive_output_mask, torch.Tensor):
             positive_output_mask = torch.tensor(positive_output_mask).bool()
         self.register_buffer("positive_output_mask",positive_output_mask.float())
         self.func = func
+        self.use_stop_grad = use_stop_grad
 
     def forward(self, x):
         # x_exp = x.exp()
@@ -256,9 +257,16 @@ class OutputProcesser(torch.nn.Module):
             raise ValueError(f"unknown func {x_pos}")
         
         ## doing this way to support auto casting to fp16 and in case there any nans
-        x = x_pos * self.positive_output_mask + x * (1 - self.positive_output_mask)
+        x1 = x_pos * self.positive_output_mask + x * (1 - self.positive_output_mask)
 
-        return x
+        if self.use_stop_grad:
+            return x1.detach() - x.detach() + x
+
+        else:
+            return x1
+
+
+       
 
 
 class BernoulliGammaOutput(torch.nn.Module):

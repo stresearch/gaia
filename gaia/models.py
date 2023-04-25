@@ -1036,9 +1036,12 @@ class TransformerModel(torch.nn.Module):
         input_index=None,
         output_index=None,
         model_type=None,
+        use_xformer = False,
         **other,
     ):
         super().__init__()
+
+        
 
         self.hidden_size = hidden_size
         # self.input_size = input_size
@@ -1050,13 +1053,51 @@ class TransformerModel(torch.nn.Module):
 
         self.input_encoder = torch.nn.Linear(self.input_size, self.hidden_size)
         self.position_encoder = torch.nn.Embedding(self.num_levels, self.hidden_size)
-        encoder_layer = torch.nn.TransformerEncoderLayer(
-            self.hidden_size, nhead=nhead, batch_first=True
-        )
-        layer_norm = torch.nn.LayerNorm(self.hidden_size)
-        self.transformer = torch.nn.TransformerEncoder(
-            encoder_layer, num_layers, layer_norm
-        )
+
+        if use_xformer:
+
+            from xformers.factory.model_factory import xFormer, xFormerConfig
+
+
+            xformer_config = [
+
+            {
+                "reversible": False,  # Optionally make these layers reversible, to save memory
+                "block_type": "encoder",
+                "num_layers": num_layers,  # Optional, this means that this config will repeat N times
+                "dim_model": hidden_size,
+                "residual_norm_style": "pre",  # Optional, pre/post
+               
+                "multi_head_config": {
+                    "num_heads": nhead,
+                    "residual_dropout": 0.1,
+                    "attention": {
+                        "name": "scaled_dot_product",  # whatever attention mechanism
+                        "dropout": 0.1,
+                        "causal": False,
+                        "seq_len": self.num_levels,
+                    },
+                },
+                "feedforward_config": {
+                    "name": "MLP",
+                    "dropout": 0.1,
+                    "activation": "gelu",
+                    "hidden_layer_multiplier": 4,
+                },
+            },
+            ]
+            
+            self.transformer = xFormer.from_config(xFormerConfig(xformer_config))
+
+        else:
+
+            encoder_layer = torch.nn.TransformerEncoderLayer( 
+                self.hidden_size, nhead=nhead, batch_first=True, dim_feedforward=4*hidden_size,
+            )
+            layer_norm = torch.nn.LayerNorm(self.hidden_size)
+            self.transformer = torch.nn.TransformerEncoder(
+                encoder_layer, num_layers, layer_norm
+            )
         self.output_layer = torch.nn.Linear(hidden_size, self.output_size)
 
         if other:

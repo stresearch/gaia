@@ -232,13 +232,16 @@ class FCLayer(torch.nn.Module):
 
 
 class OutputProcesser(torch.nn.Module):
-    def __init__(self, positive_output_mask, func = "exp", use_stop_grad = True):
+    def __init__(self, positive_output_mask, func = "exp", use_stop_grad = False):
         super().__init__()
         if not isinstance(positive_output_mask, torch.Tensor):
             positive_output_mask = torch.tensor(positive_output_mask).bool()
         self.register_buffer("positive_output_mask",positive_output_mask.float())
         self.func = func
         self.use_stop_grad = use_stop_grad
+
+        if use_stop_grad:
+            logger.info(f"using stop gradient trick for positivity constraints with {func}")
 
     def forward(self, x):
         # x_exp = x.exp()
@@ -252,6 +255,8 @@ class OutputProcesser(torch.nn.Module):
             # x_pos = x_pos.masked_fill_(~self.positive_output_mask[None,:].bool(),0)
 
         elif self.func == "rectifier":
+            if self.training:
+                return x
             x_pos = x.clip(min = 0)
         else:
             raise ValueError(f"unknown func {x_pos}")

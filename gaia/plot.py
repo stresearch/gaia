@@ -1059,7 +1059,7 @@ def save_diagnostic_plot(
         # )
 
 
-def save_gradient_plots(model_dir, device="cpu", kind="normalized"):
+def save_gradient_plots(model_dir, device="cpu", kind="normalized", dataset = None, output_file_name = None, soft_clip = True):
     import sys
 
     # sys.path.append("../../gaia-surrogate")
@@ -1100,7 +1100,7 @@ def save_gradient_plots(model_dir, device="cpu", kind="normalized"):
         # return model.model(x).sum(0)
         return model(x).sum(0)
 
-    test_dataset, test_dataloader = get_dataset_from_model(model, split="test")
+    test_dataset, test_dataloader = get_dataset_from_model(model, dataset = dataset, split="test")
 
     N = 10000
 
@@ -1166,8 +1166,11 @@ def save_gradient_plots(model_dir, device="cpu", kind="normalized"):
         else:
             output_vars.append(k)
 
+    if soft_clip:
+        J = np.tanh(J)
+
     normalized_gradient = hv.HeatMap(
-        (input_vars, output_vars, np.tanh(J)), ["input", "output"], ["gradient"]
+        (input_vars, output_vars, J), ["input", "output"], ["gradient"]
     ).opts(
         colorbar=True,
         symmetric=True,
@@ -1177,10 +1180,16 @@ def save_gradient_plots(model_dir, device="cpu", kind="normalized"):
         xrotation=90,
         tools=["hover"],
     )
+    if soft_clip:
+        normalized_gradient = normalized_gradient.redim.range(gradient=(-1.0, 1.0))
 
-    normalized_gradient = normalized_gradient.redim.range(gradient=(-1.0, 1.0))
+    if output_file_name is not None:
+        normalized_gradient = normalized_gradient.opts(title=output_file_name)
+        output_file_name = output_file_name + ".html"
+    else:
+        output_file_name = f"{kind}_gradient_tanh.html"
 
-    hv.save(normalized_gradient, os.path.join(model_dir, f"{kind}_gradient_tanh.html"))
+    hv.save(normalized_gradient, os.path.join(model_dir, output_file_name))
 
 
 def save_rel_hum_plots(

@@ -180,6 +180,7 @@ class Config():
                 "cam4_spatial": "/ssddg1/gaia/spatial/cam4-famip-30m-timestep_4",
                 "spcam_spatial": "/ssddg1/gaia/spatial/spcamclbm-nx-16-20m-timestep_4",
                 "cam4_upload4_v1": "/ssddg1/gaia/cam4_upload4_v1/cam4-famip-30m-timestep-with-b_relhum-4rth-upload",
+                "cam4_upload4_230418": "/ssddg1/gaia/cam4_upload_230418/cam4-famip-30m-timestep-third-upload_24",
             }
 
             for k,v in os.environ.items():

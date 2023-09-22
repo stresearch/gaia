@@ -206,7 +206,7 @@ PRECSL [t+1]""".split("\n")
 
 
 
-def variable_spec_2210_V5():
+def variable_spec_2304_V5():
 
     inputs = """B_Q [t+1]
 B_T [t+1]
@@ -214,6 +214,8 @@ B_U [t+1]
 B_V [t+1]
 B_OMEGA [t+1]
 B_Z3 [t+1]
+B_CLDLIQ [t+1]
+B_CLDICE [t+1]
 B_PS [t+1]
 SOLIN [t+1]
 B_SHFLX [t+1]
@@ -226,8 +228,8 @@ B_TS [t+1]""".split("\n")
 
     outputs = """A_PTTEND [t+1]
 A_PTEQ [t+1]
-PTECLDICE [t+1]
-PTECLDLIQ [t+1]
+A_PTECLDLIQ [t+1]
+A_PTECLDICE [t+1]
 FSNS [t+1]
 FLNS [t+1]
 FSNT [t+1]

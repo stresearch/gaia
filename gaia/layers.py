@@ -11,16 +11,23 @@ logger = get_logger(__name__)
 class Normalization(torch.nn.Module):
     def __init__(self, mean, std):
         super().__init__()
-        z = std == 0
+        logger.warning("hardcoding min std threshold to 1e-10")
+        self.min_std = 1e-10
+        z = std <= self.min_std
 
         if z.any():
-            logger.warn(f"found zero {z.sum()} std values, replacing with ones")
+            logger.warn(f"found {z.sum()} std values smaller than {self.min_std}, replacing with ones")
             std[z] = 1.0
 
         self.register_buffer("mean", mean[None, :, None, None])
         self.register_buffer("std", std[None, :, None, None])
 
     def forward(self, x, normalize : bool =True):
+        #check for very small std
+        # small_stds = self.std <= self.min_std
+        # # if small_stds.any():
+        # self.std[small_stds] = 1.0
+
         if normalize:
             if len(x.shape) == 4:
                 return (x - self.mean) / self.std
@@ -232,13 +239,14 @@ class FCLayer(torch.nn.Module):
 
 
 class OutputProcesser(torch.nn.Module):
-    def __init__(self, positive_output_mask, func = "exp", use_stop_grad = False):
+    def __init__(self, positive_output_mask, func = "exp", use_stop_grad = False, only_apply_in_test = False):
         super().__init__()
         if not isinstance(positive_output_mask, torch.Tensor):
             positive_output_mask = torch.tensor(positive_output_mask).bool()
         self.register_buffer("positive_output_mask",positive_output_mask.float())
         self.func = func
         self.use_stop_grad = use_stop_grad
+        self.only_apply_in_test = only_apply_in_test
 
         if use_stop_grad:
             logger.info(f"using stop gradient trick for positivity constraints with {func}")
@@ -255,7 +263,7 @@ class OutputProcesser(torch.nn.Module):
             # x_pos = x_pos.masked_fill_(~self.positive_output_mask[None,:].bool(),0)
 
         elif self.func == "rectifier":
-            if self.training:
+            if self.only_apply_in_test and self.training:
                 return x
             x_pos = x.clip(min = 0)
         else:

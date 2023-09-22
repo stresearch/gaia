@@ -17,7 +17,9 @@ name_of_dataset = "dummy"
 
 #we want 2 samples per day after keep two consecutive time steps
 steps_per_day = 16
-subsample_factor = steps_per_day//2//2
+adjacent_time_steps = 2
+target_samples_per_day = 2
+subsample_factor = steps_per_day//adjacent_time_steps//target_samples_per_day
 num_workers = 4
 
 logger.info("Preprocessing files train/val")
@@ -31,7 +33,7 @@ DataConstructor.preprocess_local_files(
     subsample_factor=subsample_factor,
     cache=cache,
     workers=num_workers,
-    time_steps=2
+    time_steps=adjacent_time_steps
 )
 
 
@@ -46,5 +48,5 @@ DataConstructor.preprocess_local_files(
     subsample_factor=subsample_factor,
     cache=cache,
     workers=num_workers,
-    time_steps=2
+    time_steps=adjacent_time_steps
 )

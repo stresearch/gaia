@@ -1,4 +1,16 @@
+
+
+
+
+
 # GAIA: Global AI Accelerator <!-- omit in toc --> 
+
+To run sample training:
+1. download sample preprocessed dataset: `bash example_download_dataset.sh`
+2. run example training code (edit which GPU you want to use):  `python example_run.py`
+
+---------------------------
+**UNDER CONSTRUCTION**
 
 This repository contains code for training and running climate neural network surrogate models. For detais on various experiments visit our site https://stresearch.github.io/gaia/
 

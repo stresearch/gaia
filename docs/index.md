@@ -17,7 +17,14 @@ Code repository and documentation for:
 ![](sections/overview/str.png)   ![](https://www.unsw.edu.au/content/dam/images/graphics/logos/unsw/unsw_0.png)
 
 - [STR](https://www.str.us) 
-- [University of New South Wales, Sydney](https://www.ccrc.unsw.edu.au/ccrc-team/academic-research/steven-sherwood)
+  -   Jim Gimlett
+  -   Gregory Bushey
+  -   Kirill Trapeznikov
+  -   Eric Jones
+- [University of New South Wales, Sydney](https://www.unsw.edu.au/)
+  -  [Steven Sherwood](https://www.unsw.edu.au/staff/steven-sherwood)
+  -  [Abhnil Prasad](https://www.unsw.edu.au/staff/abhnil-prasad)
+  -  David Fuchs 
 
 ## Sections
 - [Datasets](sections/datasets/README.md) - description of datasets used in surrogate training
@@ -29,7 +36,9 @@ Code repository and documentation for:
 - [MJO Analysis](sections/mjo_analysis/README.md) - analysis of MJO in the datasets
 - [Surrogate Bottleneck Analysis](sections/bottleneck/README.md) - analysis of bottleneck dimension of the surrogate model
 - [Linearization](sections/linearization/README.md) - analysis linearization of surrogate models to understand sensitivity to inputs
-
+- [Surrogate Architectures](sections/architectures/README.md) - comparison of different neural network architectures and configurations
+- [Fine Tuning](sections/finetuning/README.md) - comparison of fine-tuning an CAM4 trained model on SPCAM vs a model traiend from scratch
+- [Integration Journal](sections/integration/README.md) - details on integration including training setup, diagnostic plots, etc.
 
 ## Overview
 
